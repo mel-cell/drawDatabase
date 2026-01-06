@@ -1,30 +1,136 @@
 <script setup lang="ts">
-import HelloWorld from './components/HelloWorld.vue'
+import { ref } from "vue";
+import TheNavbar from "./components/layout/TheNavbar.vue";
+import TheSidebar from "./components/layout/TheSidebar.vue";
+import ERDCanvas from "./components/layout/ERDCanvas.vue";
+import SQLEditor from "./components/pages/SQLEditor.vue";
+import DataBrowser from "./components/pages/DataBrowser.vue";
+import UserManagement from "./components/pages/admin/UserManagement.vue";
+import DataDrawer from "./components/layout/DataDrawer.vue";
+import ContextPanel from "./components/layout/ContextPanel.vue";
+
+const isDataDrawerOpen = ref(false);
+const selectedTableForData = ref("");
+const selectedNodeData = ref<any>(null); // For Right Sidebar Property Editor
+const activePage = ref("diagram");
+
+const handleTableSelect = (tableName: string) => {
+  selectedTableForData.value = tableName;
+
+  if (activePage.value === "diagram") {
+    // In Diagram mode, open bottom drawer
+    isDataDrawerOpen.value = true;
+  } else {
+    // In other modes, switch to Data Browser Page to view full
+    activePage.value = "data";
+  }
+};
+
+const handleNodeSelect = (node: any) => {
+  // Canvas Node Click -> Open Context Panel (Right)
+  if (!node) {
+    selectedNodeData.value = null;
+    return;
+  }
+  selectedNodeData.value = node;
+};
+
+const handleNavigation = (page: string) => {
+  activePage.value = page;
+};
 </script>
 
 <template>
-  <div>
-    <a href="https://vite.dev" target="_blank">
-      <img src="/vite.svg" class="logo" alt="Vite logo" />
-    </a>
-    <a href="https://vuejs.org/" target="_blank">
-      <img src="./assets/vue.svg" class="logo vue" alt="Vue logo" />
-    </a>
-  </div>
-  <HelloWorld msg="Vite + Vue" />
-</template>
+  <div class="h-screen w-screen flex flex-col overflow-hidden bg-gray-50">
+    <TheNavbar :current-page="activePage" @navigate="handleNavigation" />
 
-<style scoped>
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.vue:hover {
-  filter: drop-shadow(0 0 2em #42b883aa);
-}
-</style>
+    <div class="flex-1 flex overflow-hidden">
+      <!-- Sidebar always visible for object explorer -->
+      <TheSidebar
+        @select-table="handleTableSelect"
+        @navigate="handleNavigation"
+      />
+
+      <!-- PAGE: DIAGRAM -->
+      <main
+        v-if="activePage === 'diagram'"
+        class="flex-1 relative flex flex-col overflow-hidden animate-in fade-in duration-300"
+      >
+        <ERDCanvas @node-select="handleNodeSelect" />
+        <DataDrawer
+          :is-open="isDataDrawerOpen"
+          :table-name="selectedTableForData"
+          @close="isDataDrawerOpen = false"
+        />
+      </main>
+
+      <!-- PAGE: SQL EDITOR -->
+      <main
+        v-else-if="activePage === 'sql'"
+        class="flex-1 relative flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300"
+      >
+        <SQLEditor />
+      </main>
+
+      <!-- PAGE: BROWSE DATA -->
+      <main
+        v-else-if="activePage === 'data'"
+        class="flex-1 relative flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300"
+      >
+        <DataBrowser :table-name="selectedTableForData" />
+      </main>
+
+      <!-- PAGE: ADMIN - USERS -->
+      <main
+        v-else-if="activePage === 'admin-users'"
+        class="flex-1 relative flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300"
+      >
+        <UserManagement />
+      </main>
+
+      <!-- PAGE: ADMIN - STATUS (Placeholder) -->
+      <main
+        v-else-if="activePage === 'admin-status'"
+        class="flex-1 flex items-center justify-center bg-gray-50 text-gray-400"
+      >
+        <div class="text-center">
+          <p class="text-lg font-semibold">Server Status Dashboard</p>
+          <p class="text-sm">
+            Realtime process list & monitoring (Coming Soon)
+          </p>
+        </div>
+      </main>
+
+      <!-- PAGE: ADMIN - VARIABLES (Placeholder) -->
+      <main
+        v-else-if="activePage === 'admin-variables'"
+        class="flex-1 flex items-center justify-center bg-gray-50 text-gray-400"
+      >
+        <div class="text-center">
+          <p class="text-lg font-semibold">Server Variables</p>
+          <p class="text-sm">Config editor (Coming Soon)</p>
+        </div>
+      </main>
+
+      <!-- Right Sidebar (Only visible in Diagram mode) -->
+      <ContextPanel
+        v-if="activePage === 'diagram'"
+        class="shrink-0"
+        :type="
+          selectedNodeData
+            ? 'table-edit'
+            : selectedTableForData
+            ? 'table'
+            : 'server'
+        "
+        :data="
+          selectedNodeData
+            ? selectedNodeData
+            : selectedTableForData
+            ? { name: selectedTableForData }
+            : null
+        "
+      />
+    </div>
+  </div>
+</template>
