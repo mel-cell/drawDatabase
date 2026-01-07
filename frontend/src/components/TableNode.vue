@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { Handle, Position } from "@vue-flow/core";
 import { Key, Settings, Eye, Trash2 } from "lucide-vue-next";
+import { useDiagram } from "../composables/useDiagram";
 
-defineProps<{
+const props = defineProps<{
+  id: string; // Inject ID prop
   data: {
     label: string;
+    headerColor?: string;
     columns: Array<{
       name: string;
       type: string;
@@ -13,6 +16,8 @@ defineProps<{
     }>;
   };
 }>();
+
+const { removeNode } = useDiagram();
 
 const getTypeColor = (type: string) => {
   const t = type.toLowerCase();
@@ -40,6 +45,7 @@ const getTypeColor = (type: string) => {
       </button>
       <div class="w-px h-3 bg-gray-600 self-center mx-0.5"></div>
       <button
+        @click.stop="removeNode(props.id)"
         class="p-1 hover:bg-red-600 rounded text-red-200 hover:text-white"
         title="Drop Table"
       >
@@ -50,6 +56,10 @@ const getTypeColor = (type: string) => {
     <!-- Header -->
     <div
       class="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 px-3 py-2 font-bold text-gray-800 flex items-center justify-between text-sm"
+      :style="{
+        backgroundColor: data.headerColor || '',
+        backgroundImage: data.headerColor ? 'none' : '',
+      }"
     >
       <span class="truncate">{{ data.label }}</span>
       <!-- Table Options / More Menu could go here -->

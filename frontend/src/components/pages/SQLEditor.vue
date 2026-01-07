@@ -1,31 +1,46 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { Play, Eraser, Download, Copy, Check } from "lucide-vue-next";
+import { Play, Eraser, Download, Copy, Check, Loader2 } from "lucide-vue-next";
 
-const query = ref(`SELECT u.id, u.username, COUNT(o.id) as order_count 
-FROM users u 
-LEFT JOIN orders o ON u.id = o.user_id 
-GROUP BY u.id 
-HAVING order_count > 5;`);
+const query = ref("SELECT * FROM users LIMIT 10;");
 
 const results = ref<any[]>([]);
 const isLoading = ref(false);
 const executionTime = ref(0);
+const error = ref("");
 
-// Mock Execution
-const executeQuery = () => {
+const executeQuery = async () => {
   isLoading.value = true;
+  error.value = "";
+  results.value = [];
   const start = performance.now();
 
-  setTimeout(() => {
-    results.value = [
-      { id: 101, username: "dev_mellow", order_count: 12 },
-      { id: 145, username: "super_admin", order_count: 45 },
-      { id: 202, username: "test_user_01", order_count: 8 },
-    ];
+  try {
+    const res = await fetch("http://localhost:3000/api/execute", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: query.value }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || "Query failed");
+    }
+
+    const data = await res.json();
+    // Normalize data: data could be array of objects or status message
+    if (Array.isArray(data)) {
+      results.value = data;
+    } else {
+      // Handle non-select result provided as single object or specific structure
+      results.value = [data];
+    }
+  } catch (e: any) {
+    error.value = e.message;
+  } finally {
     executionTime.value = Math.round(performance.now() - start);
     isLoading.value = false;
-  }, 600);
+  }
 };
 </script>
 
@@ -37,11 +52,15 @@ const executeQuery = () => {
     >
       <button
         @click="executeQuery"
-        class="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white text-xs font-bold rounded shadow-sm hover:bg-green-700 active:scale-95 transition-all"
+        :disabled="isLoading"
+        class="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white text-xs font-bold rounded shadow-sm hover:bg-green-700 active:scale-95 transition-all disabled:opacity-50"
       >
-        <Play class="w-3.5 h-3.5 fill-current" /> RUN
+        <Loader2 v-if="isLoading" class="w-3.5 h-3.5 animate-spin" />
+        <Play v-else class="w-3.5 h-3.5 fill-current" />
+        RUN
       </button>
       <button
+        @click="query = ''"
         class="p-1.5 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded"
         title="Clear"
       >
@@ -49,7 +68,7 @@ const executeQuery = () => {
       </button>
       <div class="w-px h-5 bg-gray-200 mx-2"></div>
       <span class="text-xs text-gray-500 font-mono"
-        >Target: localhost:3306 / draw_db</span
+        >Target: localhost:3306</span
       >
     </div>
 
@@ -70,6 +89,7 @@ const executeQuery = () => {
           v-model="query"
           class="flex-1 bg-transparent border-none outline-none resize-none p-4 leading-6 text-[#d4d4d4]"
           spellcheck="false"
+          placeholder="Enter SQL Query here..."
         ></textarea>
 
         <!-- Floating status -->
@@ -94,42 +114,48 @@ const executeQuery = () => {
             <span
               v-if="results.length"
               class="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full text-[10px]"
-              >{{ results.length }} rows</span
             >
+              {{ results.length }} rows
+            </span>
           </h3>
           <div
-            v-if="!isLoading && results.length"
-            class="text-[10px] text-green-600 font-medium"
+            v-if="!isLoading && executionTime > 0"
+            class="text-[10px] text-gray-500 font-medium"
           >
-            Success in {{ executionTime }}ms
+            <span :class="error ? 'text-red-600' : 'text-green-600'">
+              {{ error ? "Failed" : "Success" }}
+            </span>
+            in {{ executionTime }}ms
           </div>
         </div>
 
-        <div class="flex-1 overflow-auto relative">
+        <div class="flex-1 overflow-auto relative bg-white">
+          <!-- Error State -->
           <div
-            v-if="isLoading"
-            class="absolute inset-0 flex items-center justify-center bg-white/80 z-20"
+            v-if="error"
+            class="p-4 text-red-600 font-mono text-xs bg-red-50 h-full"
           >
-            <div
-              class="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"
-            ></div>
+            ERROR: {{ error }}
           </div>
 
+          <!-- Table Results -->
           <table
-            v-if="results.length"
+            v-else-if="results.length"
             class="w-full text-left text-xs border-collapse font-mono"
           >
-            <thead class="bg-gray-100 sticky top-0 border-b border-gray-200">
+            <thead
+              class="bg-gray-100 sticky top-0 border-b border-gray-200 shadow-sm"
+            >
               <tr>
                 <th
-                  class="px-4 py-2 text-gray-600 font-semibold w-12 text-center"
+                  class="px-4 py-2 text-gray-600 font-semibold w-12 text-center bg-gray-100"
                 >
                   #
                 </th>
                 <th
                   v-for="(val, key) in results[0]"
                   :key="key"
-                  class="px-4 py-2 text-gray-600 font-semibold border-r border-gray-200 last:border-0"
+                  class="px-4 py-2 text-gray-600 font-semibold border-r border-gray-200 last:border-0 bg-gray-100"
                 >
                   {{ key }}
                 </th>
@@ -147,7 +173,7 @@ const executeQuery = () => {
                 <td
                   v-for="(val, key) in row"
                   :key="key"
-                  class="px-4 py-1.5 text-gray-700 border-r border-gray-200 last:border-0"
+                  class="px-4 py-1.5 text-gray-700 border-r border-gray-200 last:border-0 whitespace-pre-wrap truncate max-w-xs"
                 >
                   {{ val }}
                 </td>
@@ -155,12 +181,26 @@ const executeQuery = () => {
             </tbody>
           </table>
 
+          <!-- Empty State -->
           <div
             v-else-if="!isLoading"
             class="flex flex-col items-center justify-center h-full text-gray-400"
           >
             <Play class="w-8 h-8 mb-2 opacity-50" />
             <p class="text-sm">Run a query to see results</p>
+          </div>
+
+          <!-- Loading State -->
+          <div
+            v-if="isLoading"
+            class="absolute inset-0 flex items-center justify-center bg-white/80 z-20"
+          >
+            <div class="flex flex-col items-center gap-2">
+              <Loader2 class="w-8 h-8 text-blue-500 animate-spin" />
+              <span class="text-xs font-semibold text-gray-500"
+                >Executing Query...</span
+              >
+            </div>
           </div>
         </div>
       </div>

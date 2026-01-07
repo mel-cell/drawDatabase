@@ -1,14 +1,6 @@
 import { ref } from "vue";
 
-const API_URL = "http://localhost:3000/api";
-
-// Shared State (Singleton)
-const tables = ref<TableSchema[]>([]);
-const relations = ref<RelationSchema[]>([]);
-const databases = ref<string[]>([]);
-const currentDatabase = ref("draw_db");
-
-interface Column {
+export interface ColumnSchema {
   name: string;
   type: string;
   is_pk: boolean;
@@ -17,7 +9,7 @@ interface Column {
 
 export interface TableSchema {
   name: string;
-  columns: Column[];
+  columns: ColumnSchema[];
 }
 
 export interface RelationSchema {
@@ -27,58 +19,76 @@ export interface RelationSchema {
   target_column: string;
 }
 
+// Global State
+const tables = ref<TableSchema[]>([]);
+const relations = ref<RelationSchema[]>([]);
+const databases = ref<string[]>([]);
+const currentDatabase = ref<string>("draw_db"); // Default
+
 export function useSchema() {
   const fetchDatabases = async () => {
     try {
-      const res = await fetch(`${API_URL}/databases`);
-      const data = await res.json();
-      databases.value = data;
-    } catch (error) {
-      console.error("Failed to fetch databases:", error);
+      const res = await fetch("http://localhost:3000/api/databases");
+      if (res.ok) {
+        databases.value = await res.json();
+      }
+    } catch (e) {
+      console.error("Failed to fetch databases", e);
     }
   };
 
-  const fetchSchema = async () => {
-    try {
-      // Fetch schema for the currently selected database
-      const res = await fetch(`${API_URL}/schema?db=${currentDatabase.value}`);
-      const data = await res.json();
+  const fetchSchema = async (dbName?: string) => {
+    // If dbName provided, switch to it. Else use current.
+    const target = dbName || currentDatabase.value;
 
+    try {
+      // Pass ?db=name to backend
+      const res = await fetch(`http://localhost:3000/api/schema?db=${target}`);
+      if (!res.ok) throw new Error("Failed to fetch schema");
+
+      const data = await res.json();
       tables.value = data.tables || [];
       relations.value = data.relations || [];
+
+      if (dbName) currentDatabase.value = dbName;
+
+      console.log(`Schema loaded for ${target}: ${tables.value.length} tables`);
     } catch (error) {
-      console.error("Failed to fetch schema:", error);
+      console.error(error);
     }
+  };
+
+  const switchDatabase = async (name: string) => {
+    await fetchSchema(name);
   };
 
   const createTable = async (tableData: any) => {
     try {
-      const res = await fetch(`${API_URL}/tables`, {
+      const res = await fetch("http://localhost:3000/api/tables", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(tableData),
       });
 
       if (!res.ok) throw new Error("Failed to create table");
 
-      // Refresh schema after creation
       await fetchSchema();
       return true;
     } catch (error) {
-      console.error("Failed to create table:", error);
+      console.error(error);
+      alert("Failed to create table");
       return false;
     }
   };
 
   return {
-    currentDatabase,
-    databases,
     tables,
     relations,
+    databases,
+    currentDatabase,
     fetchSchema,
     fetchDatabases,
+    switchDatabase,
     createTable,
   };
 }

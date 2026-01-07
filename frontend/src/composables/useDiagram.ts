@@ -7,8 +7,8 @@ const nodes = ref<any[]>([]);
 const edges = ref<any[]>([]);
 
 export function useDiagram() {
-  const { onConnect, addEdges } = useVueFlow(); // VueFlow adds logic
-  const { tables, relations, fetchSchema } = useSchema();
+  const { onConnect, addEdges: flowAddEdges } = useVueFlow(); // VueFlow adds logic
+  const { tables, relations, fetchSchema, currentDatabase } = useSchema();
 
   // Helper to remove node globally
   const removeNode = (id: string) => {
@@ -26,16 +26,21 @@ export function useDiagram() {
     return t;
   };
 
-  const syncDiagram = () => {
-    // Transform Tables to Nodes (Layout logic remains)
+  const syncDiagram = (forceReset = false) => {
+    // Layout Config
     let x = 100;
     let y = 100;
     const GAP_X = 350;
     const GAP_Y = 300;
     const COLS_PER_ROW = 3;
 
-    // Only sync if nodes are empty (initial load) to avoid overwriting drags
-    // Or if forced (future feature)
+    // Reset if forced (e.g. DB change)
+    if (forceReset) {
+      nodes.value = [];
+      edges.value = [];
+    }
+
+    // Only sync if nodes are empty (initial load or after reset) to avoid overwriting drags
     if (nodes.value.length === 0 && tables.value.length > 0) {
       nodes.value = tables.value.map((table: TableSchema, index: number) => {
         const col = index % COLS_PER_ROW;
@@ -46,6 +51,7 @@ export function useDiagram() {
           type: "table",
           position: { x: x + col * GAP_X, y: y + row * GAP_Y },
           data: {
+            name: table.name, // Ensure consistent naming logic
             label: table.name,
             columns: table.columns.map((c) => ({
               name: c.name,
@@ -78,21 +84,28 @@ export function useDiagram() {
 
   // Initial Fetch
   onMounted(async () => {
-    await fetchSchema();
+    if (tables.value.length === 0) await fetchSchema();
+    syncDiagram();
   });
 
-  // Watch for schema changes to update diagram
+  // Watch for Database Switch
+  watch(currentDatabase, () => {
+    // Force reset canvas when DB changes
+    syncDiagram(true);
+  });
+
+  // Watch for schema changes (e.g. creating tables in same DB)
   watch(
     [tables, relations],
     () => {
-      syncDiagram();
+      syncDiagram(false); // Soft sync (only if empty)
     },
     { deep: true }
   );
 
   // Setup Event Handlers
   onConnect((params: Connection) => {
-    addEdges([params]);
+    flowAddEdges([params]);
   });
 
   return {

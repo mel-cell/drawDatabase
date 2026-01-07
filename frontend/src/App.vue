@@ -12,6 +12,7 @@ import ContextPanel from "./components/layout/ContextPanel.vue";
 const isDataDrawerOpen = ref(false);
 const selectedTableForData = ref("");
 const selectedNodeData = ref<any>(null); // For Right Sidebar Property Editor
+const selectionTimestamp = ref(0); // Trigger to force reopen panel
 const activePage = ref("diagram");
 
 const handleTableSelect = (tableName: string) => {
@@ -33,6 +34,7 @@ const handleNodeSelect = (node: any) => {
     return;
   }
   selectedNodeData.value = node;
+  selectionTimestamp.value = Date.now(); // Force update trigger
 };
 
 const handleNavigation = (page: string) => {
@@ -116,9 +118,12 @@ const handleNavigation = (page: string) => {
       <ContextPanel
         v-if="activePage === 'diagram'"
         class="shrink-0"
+        :trigger="selectionTimestamp"
         :type="
           selectedNodeData
-            ? 'table-edit'
+            ? selectedNodeData.type === 'custom-note'
+              ? 'note-edit'
+              : 'table-edit'
             : selectedTableForData
             ? 'table'
             : 'server'

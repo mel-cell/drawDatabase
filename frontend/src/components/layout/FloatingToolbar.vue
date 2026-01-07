@@ -10,6 +10,7 @@ import {
   ZoomOut,
   Redo,
   Undo,
+  LayoutGrid,
 } from "lucide-vue-next";
 
 const emit = defineEmits(["tool-action"]);
@@ -102,6 +103,18 @@ const setTool = (tool: string) => {
       >
         <Type class="w-5 h-5" />
         <span class="tooltip-text">Add Text</span>
+      </button>
+
+      <button
+        @click="setTool('group')"
+        class="p-2 rounded hover:bg-gray-100 transition-colors tooltip relative group"
+        :class="{
+          'bg-blue-50 text-blue-600': activeTool === 'group',
+          'text-gray-600': activeTool !== 'group',
+        }"
+      >
+        <LayoutGrid class="w-5 h-5" />
+        <span class="tooltip-text">Add Group</span>
       </button>
     </div>
 

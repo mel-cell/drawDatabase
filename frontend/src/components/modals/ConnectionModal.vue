@@ -210,7 +210,7 @@ const handleConnect = () => {
                   <div
                     class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white font-bold text-xs"
                   >
-                    MY
+                    <Database class="w-4 h-4" />
                   </div>
                   <span class="font-medium text-blue-900">MySQL</span>
                 </label>

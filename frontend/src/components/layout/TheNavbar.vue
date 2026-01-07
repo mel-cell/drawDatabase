@@ -2,28 +2,115 @@
 import { ref } from "vue";
 import AddTableModal from "../modals/AddTableModal.vue";
 import { useSchema } from "../../composables/useSchema";
+import { useDiagram } from "../../composables/useDiagram";
 import {
   Save,
   Play,
   Settings,
-  Database,
+  Database as DatabaseIcon,
+  Network,
+  TerminalSquare,
+  Table2,
   Download,
   User,
+  Loader2,
 } from "lucide-vue-next";
 
 defineProps<{
   currentPage: string;
 }>();
 
-const emit = defineEmits(["navigate"]);
+defineEmits(["navigate"]);
 
-const { createTable } = useSchema();
+const { createTable, fetchSchema, currentDatabase } = useSchema(); // Global Active Database
+const { nodes } = useDiagram();
+
 const showAddTableModal = ref(false);
+const isSaving = ref(false);
+
+// Logic: Mengubah Gambar Canvas -> Tabel Nyata di Database
+const handleSave = async () => {
+  const draftTables = nodes.value.filter((n) => n.type === "table");
+
+  if (draftTables.length === 0) {
+    alert("Canvas kosong. Tambahkan tabel dulu.");
+    return;
+  }
+
+  if (
+    !confirm(
+      `Simpan Schema? Ini akan membuat ${draftTables.length} tabel di database '${currentDatabase.value}'.`
+    )
+  )
+    return;
+
+  isSaving.value = true;
+  let successCount = 0;
+
+  try {
+    for (const node of draftTables) {
+      const tableData = node.data || {};
+      const tableName = tableData.name || tableData.label || "untitled";
+
+      // Payload ke Backend
+      const payload = {
+        name: tableName,
+        columns: (tableData.columns || []).map((col: any) => ({
+          name: col.name,
+          type: col.type,
+          is_pk: col.is_pk || false,
+          is_nn: col.is_nn || false,
+        })),
+      };
+
+      const res = await fetch("http://localhost:3000/api/tables", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) successCount++;
+    }
+
+    await fetchSchema(); // Refresh Sidebar
+    alert(`Berhasil! ${successCount} tabel telah dibuat/diupdate.`);
+  } catch (e) {
+    console.error(e);
+    alert("Gagal menyimpan ke database. Pastikan backend jalan.");
+  } finally {
+    isSaving.value = false;
+  }
+};
 
 const handleCreateTable = async (data: any) => {
   const success = await createTable(data);
   if (success) {
     showAddTableModal.value = false;
+  }
+};
+
+const handleCreateDatabase = async () => {
+  const name = prompt("Enter new database name:");
+  if (!name) return;
+
+  // Prevent space or special char if needed
+  try {
+    const res = await fetch("http://localhost:3000/api/databases", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+
+    if (res.ok) {
+      alert(`Database '${name}' created!`);
+      await fetchSchema(); // Refresh sidebar list
+    } else {
+      const err = await res.json();
+      alert(`Failed: ${err.error}`);
+    }
+  } catch (e) {
+    console.error(e);
+    alert("Network error");
   }
 };
 </script>
@@ -45,6 +132,16 @@ const handleCreateTable = async (data: any) => {
             D
           </div>
           <span class="font-bold tracking-wide text-gray-200">DrawDB</span>
+
+          <!-- Database Indicator -->
+          <span
+            class="px-2 py-0.5 bg-gray-700 rounded text-[10px] text-blue-200 flex items-center gap-1 border border-gray-600 transition-all hover:bg-gray-600 cursor-help"
+            title="Active Database Context"
+          >
+            <DatabaseIcon class="w-2.5 h-2.5" />
+            <span class="opacity-80">Active:</span>
+            <span class="font-bold">{{ currentDatabase || "None" }}</span>
+          </span>
         </div>
 
         <!-- Classic Menus -->
@@ -78,10 +175,11 @@ const handleCreateTable = async (data: any) => {
       <!-- Left: Primary Actions -->
       <div class="flex items-center gap-2">
         <button
+          @click="handleCreateDatabase"
           class="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium transition-all shadow-sm active:scale-95"
           title="Create New Database"
         >
-          <Database class="w-4 h-4" />
+          <DatabaseIcon class="w-4 h-4" />
           <span>New Database</span>
         </button>
 
@@ -89,19 +187,28 @@ const handleCreateTable = async (data: any) => {
 
         <button
           class="p-1.5 text-gray-600 hover:bg-gray-100 rounded hover:text-blue-600"
-          title="Execute SQL"
+          title="Execute SQL Query"
         >
           <Play class="w-4 h-4" />
         </button>
+
+        <!-- SAVE SCHEMA BUTTON -->
         <button
-          class="p-1.5 text-gray-600 hover:bg-gray-100 rounded hover:text-blue-600"
-          title="Save Schema"
+          @click="handleSave"
+          :disabled="isSaving"
+          class="p-1.5 text-gray-600 hover:bg-gray-100 rounded hover:text-blue-600 disabled:opacity-50 disabled:cursor-wait"
+          title="Save Schema to Database"
         >
-          <Save class="w-4 h-4" />
+          <Loader2
+            v-if="isSaving"
+            class="w-4 h-4 animate-spin text-emerald-600"
+          />
+          <Save v-else class="w-4 h-4" />
         </button>
+
         <button
           class="p-1.5 text-gray-600 hover:bg-gray-100 rounded hover:text-blue-600"
-          title="Export"
+          title="Export Diagram"
         >
           <Download class="w-4 h-4" />
         </button>

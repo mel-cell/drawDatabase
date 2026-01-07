@@ -8,7 +8,7 @@ const props = defineProps<{
   hasChildren?: boolean;
 }>();
 
-const emit = defineEmits(["toggle", "click"]);
+const emit = defineEmits(["toggle", "click", "contextmenu"]);
 
 const isOpen = ref(props.isOpen || false);
 
@@ -27,6 +27,7 @@ const toggle = () => {
         toggle();
         $emit('click');
       "
+      @contextmenu.prevent="$emit('contextmenu', $event)"
       class="flex items-center py-1 px-2 hover:bg-gray-100 cursor-pointer rounded-sm group text-sm"
       :class="{ 'text-blue-600': isOpen }"
     >
