@@ -15,7 +15,7 @@ defineEmits(["close", "confirm"]);
 <template>
   <div
     v-if="isOpen"
-    class="fixed inset-0 z-[70] flex items-center justify-center bg-gray-900/50 backdrop-blur-sm transition-all"
+    class="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/50 backdrop-blur-sm transition-all"
   >
     <div
       class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden border border-gray-100 ring-1 ring-black/5 animate-in fade-in zoom-in-95 duration-200"

@@ -12,7 +12,38 @@ const emit = defineEmits(["tool-action", "node-select"]);
 
 // Init Diagram Logic
 const { nodes, edges, removeNode } = useDiagram();
-const { onNodeClick, onPaneClick, onNodeContextMenu } = useVueFlow();
+const {
+  onNodeClick,
+  onPaneClick,
+  onNodeContextMenu,
+  zoomIn,
+  zoomOut,
+  setNodes,
+  setEdges,
+  toObject,
+} = useVueFlow();
+
+// History State for Undo/Redo
+const history = ref<any[]>([]);
+const historyIndex = ref(-1);
+const isUndoing = ref(false);
+
+const recordHistory = () => {
+  if (isUndoing.value) return;
+  const state = toObject();
+  // truncated future history if we were back in time
+  if (historyIndex.value < history.value.length - 1) {
+    history.value = history.value.slice(0, historyIndex.value + 1);
+  }
+  history.value.push(JSON.stringify(state));
+  historyIndex.value++;
+};
+
+// Initial Record
+setTimeout(() => recordHistory(), 500);
+
+// TODO: Watch for standard changes to record history automatically, or just on actions.
+// For now, record on explicit actions for simplicity.
 
 // Tool State
 const currentTool = ref<string>("pointer");
@@ -27,8 +58,8 @@ const contextMenu = ref({
 
 const menuItems = ref([{ label: "Delete", action: "delete", danger: true }]);
 
-onNodeClick((event) => {
-  if (currentTool.value === "hand") return; // Hand tool shouldn't select nodes? Or standard behavior
+onNodeClick((event: any) => {
+  if (currentTool.value === "hand") return;
   emit("node-select", event.node);
   contextMenu.value.visible = false;
 });
@@ -38,7 +69,7 @@ onPaneClick(() => {
   contextMenu.value.visible = false;
 });
 
-onNodeContextMenu((event) => {
+onNodeContextMenu((event: any) => {
   event.event.preventDefault();
   const e = event.event as MouseEvent;
   contextMenu.value = {
@@ -53,12 +84,52 @@ const handleContextSelect = (action: string) => {
   if (action === "delete" && contextMenu.value.targetNodeId) {
     removeNode(contextMenu.value.targetNodeId);
     emit("node-select", null);
+    recordHistory();
   }
   contextMenu.value.visible = false;
 };
 
+const undo = () => {
+  if (historyIndex.value > 0) {
+    isUndoing.value = true;
+    historyIndex.value--;
+    const state = JSON.parse(history.value[historyIndex.value]);
+    setNodes(state.nodes);
+    setEdges(state.edges);
+    setTimeout(() => (isUndoing.value = false), 100);
+  }
+};
+
+const redo = () => {
+  if (historyIndex.value < history.value.length - 1) {
+    isUndoing.value = true;
+    historyIndex.value++;
+    const state = JSON.parse(history.value[historyIndex.value]);
+    setNodes(state.nodes);
+    setEdges(state.edges);
+    setTimeout(() => (isUndoing.value = false), 100);
+  }
+};
+
 const handleToolAction = (action: string) => {
   contextMenu.value.visible = false;
+
+  if (action === "zoom-in") {
+    zoomIn();
+    return;
+  }
+  if (action === "zoom-out") {
+    zoomOut();
+    return;
+  }
+  if (action === "undo") {
+    undo();
+    return;
+  }
+  if (action === "redo") {
+    redo();
+    return;
+  }
 
   if (action === "pointer" || action === "hand") {
     currentTool.value = action;
@@ -77,6 +148,7 @@ const handleToolAction = (action: string) => {
         columns: [{ name: "id", type: "INT", is_pk: true, is_nn: true }],
       },
     });
+    recordHistory();
     currentTool.value = "pointer";
   } else if (action === "note") {
     nodes.value.push({
@@ -96,6 +168,7 @@ const handleToolAction = (action: string) => {
         boxShadow: "2px 2px 5px rgba(0,0,0,0.1)",
       },
     });
+    recordHistory();
     currentTool.value = "pointer";
   } else if (action === "text") {
     nodes.value.push({
@@ -117,13 +190,14 @@ const handleToolAction = (action: string) => {
       },
       class: "hover:border-blue-300", // Tailwind class for hover effect
     });
+    recordHistory();
     currentTool.value = "pointer";
   } else if (action === "group") {
     nodes.value.push({
       id: `group_${Date.now()}`,
-      type: "default",
+      type: "custom-group", // CHANGED from default
       position: pos,
-      data: { label: "New Group" },
+      data: { label: "New Group", color: "rgba(240, 244, 248, 0.5)" },
       style: {
         width: "300px",
         height: "200px",
@@ -132,9 +206,10 @@ const handleToolAction = (action: string) => {
         borderRadius: "8px",
         zIndex: -1,
         resize: "both",
-        overflow: "hidden",
+        overflow: "visible",
       },
     });
+    recordHistory();
     currentTool.value = "pointer";
   }
 };
@@ -168,6 +243,14 @@ const handleToolAction = (action: string) => {
 
       <template #node-custom-note="props">
         <NoteNode
+          :id="props.id"
+          :data="props.data"
+          :selected="props.selected"
+        />
+      </template>
+
+      <template #node-custom-group="props">
+        <GroupNode
           :id="props.id"
           :data="props.data"
           :selected="props.selected"

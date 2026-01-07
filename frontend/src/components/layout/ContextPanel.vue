@@ -1,24 +1,43 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { ref, computed, watch, nextTick } from "vue";
 import { useDiagram } from "../../composables/useDiagram";
 import {
-  Info,
-  FileCode,
-  ChevronRight,
+  Settings,
+  X,
   Plus,
   Trash2,
   Palette,
   Database,
   Table as TableIcon,
+  LayoutGrid,
+  FileText,
+  MousePointer2,
+  AlignLeft,
+  Type,
+  Maximize2,
+  Minimize2,
+  MoreHorizontal,
+  Info,
 } from "lucide-vue-next";
 
-// ... props and setup ...
+// Define Props
 const props = defineProps<{
-  type: "server" | "database" | "table" | "table-edit" | "note-edit" | "none";
+  type:
+    | "server"
+    | "database"
+    | "table"
+    | "table-edit"
+    | "note-edit"
+    | "group-edit"
+    | "none";
   data?: any;
   trigger?: number; // Force reopen trigger
   activeDatabase?: string;
 }>();
+
+// ...
+const groupLabel = ref("");
+const groupColor = ref("#rgba(240, 244, 248, 0.5)");
 
 const { removeNode, edges, nodes } = useDiagram();
 
@@ -29,9 +48,9 @@ const panelWidth = ref(320);
 
 // ... (Resize State)
 const isResizing = ref(false);
-// ...
 const minWidth = 300;
 const maxWidth = 800;
+
 // ... (Local Edit State)
 const tablename = ref("");
 const tableColor = ref("#ffffff");
@@ -52,8 +71,11 @@ const syncFromProps = () => {
       activeTab.value = "info";
       isExpanded.value = true;
     }
-  } else if (props.activeDatabase && !isExpanded.value && props.trigger) {
-    // If triggered specifically for DB without selection
+  } else if (
+    props.type === "database" ||
+    (props.activeDatabase && props.trigger)
+  ) {
+    // If triggered specifically for DB without selection, or type is explicitly database
     activeTab.value = "database";
     isExpanded.value = true;
   }
@@ -69,7 +91,6 @@ const syncFromProps = () => {
         expanded: false,
       }));
     } else if (props.type === "note-edit") {
-      // ...
       const noteData = newData.data;
       noteLabel.value = noteData.label || "";
       const styles = noteData.style || {};
@@ -80,9 +101,21 @@ const syncFromProps = () => {
         fontWeight: styles.fontWeight || "normal",
         backgroundColor: rootStyles.backgroundColor || "#fef3c7",
       };
+    } else if (props.type === "group-edit") {
+      const groupData = newData.data;
+      groupLabel.value = groupData.label || "Group";
+      groupColor.value = groupData.color || "rgba(240, 244, 248, 0.5)";
     }
   }
 };
+
+const handleDeleteGroup = () => {
+  if (confirm("Delete this group?")) {
+    removeNode(props.data.id);
+    isExpanded.value = false;
+  }
+};
+
 // Watchers
 watch(
   () => props.trigger,
@@ -252,6 +285,24 @@ const handleDeleteTable = () => {
         <FileCode class="w-5 h-5" />
       </button>
 
+      <!-- TAB 4: GROUP PROPERTIES (Layout Icon) -->
+      <button
+        v-if="type === 'group-edit'"
+        @click="
+          activeTab = 'info';
+          isExpanded = true;
+        "
+        class="p-2 rounded-lg transition-colors relative group"
+        :class="
+          activeTab === 'info' && isExpanded
+            ? 'bg-blue-100 text-blue-600'
+            : 'text-gray-400 hover:bg-gray-100'
+        "
+        title="Group Properties"
+      >
+        <LayoutGrid class="w-5 h-5" />
+      </button>
+
       <div class="flex-1"></div>
 
       <button
@@ -290,9 +341,20 @@ const handleDeleteTable = () => {
                 ? "Server Info"
                 : props.type === "note-edit"
                 ? "Note Properties"
+                : props.type === "group-edit"
+                ? "Group Properties"
+                : props.type === "database"
+                ? "Database Info"
                 : "Table Inspector"
             }}
           </h3>
+          <button
+            @click="isExpanded = false"
+            class="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-200 transition-colors"
+            title="Close Panel"
+          >
+            <X class="w-4 h-4" />
+          </button>
         </div>
 
         <!-- TABLE EDITOR -->
@@ -696,6 +758,53 @@ const handleDeleteTable = () => {
               class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors text-xs font-semibold"
             >
               <Trash2 class="w-4 h-4" /> Delete Node
+            </button>
+          </div>
+        </div>
+
+        <!-- GROUP EDITOR -->
+        <div
+          v-else-if="activeTab === 'info' && props.type === 'group-edit'"
+          class="flex-1 overflow-y-auto p-4 scrollbar-thin"
+        >
+          <div class="mb-6">
+            <label
+              class="block text-[10px] uppercase font-bold text-gray-400 mb-1"
+              >Group Label</label
+            >
+            <input
+              v-model="groupLabel"
+              type="text"
+              class="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-200 outline-none"
+              placeholder="e.g. Auth Module"
+            />
+          </div>
+
+          <div class="mb-6">
+            <label
+              class="block text-[10px] uppercase font-bold text-gray-400 mb-1"
+              >Background Color</label
+            >
+            <div class="flex items-center gap-2">
+              <input
+                v-model="groupColor"
+                type="color"
+                class="w-8 h-8 p-0 border border-gray-300 rounded overflow-hidden cursor-pointer"
+              />
+              <input
+                v-model="groupColor"
+                type="text"
+                class="flex-1 text-xs border border-gray-300 rounded px-2 py-1.5 bg-gray-50 font-mono"
+              />
+            </div>
+          </div>
+
+          <div class="mt-8 pt-6 border-t border-gray-100">
+            <button
+              @click="handleDeleteGroup"
+              class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors text-xs font-semibold"
+            >
+              <Trash2 class="w-4 h-4" /> Delete Group
             </button>
           </div>
         </div>

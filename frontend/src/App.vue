@@ -34,6 +34,7 @@ const handleTableSelect = (tableName: string) => {
 
 const handleDatabaseSelect = (dbName: string) => {
   selectedDatabase.value = dbName;
+  currentDatabase.value = dbName; // Sync global state
   selectedTableForData.value = "";
   selectedNodeData.value = null;
   selectionTimestamp.value = Date.now();
@@ -46,7 +47,9 @@ const handleNodeSelect = (node: any) => {
     return;
   }
   selectedNodeData.value = node;
-  selectedDatabase.value = "";
+  // Don't clear selectedDatabase if it's just a node click,
+  // but usually nodes belong to the DB.
+  // For now, let's keep selectedDatabase active so context panel knows context.
   selectionTimestamp.value = Date.now(); // Force update trigger
 };
 
@@ -138,7 +141,11 @@ const handleNavigation = (page: string) => {
           selectedNodeData
             ? selectedNodeData.type === 'custom-note'
               ? 'note-edit'
+              : selectedNodeData.type === 'custom-group'
+              ? 'group-edit'
               : 'table-edit'
+            : selectedDatabase
+            ? 'database'
             : 'none'
         "
         :data="selectedNodeData"
