@@ -13,6 +13,7 @@ func SetupRoutes(app *fiber.App) {
 	api.Get("/schema", handlers.GetSchema)
 	api.Get("/databases", handlers.GetDatabases)
 	api.Post("/tables", handlers.CreateTable)
+	api.Delete("/tables", handlers.DeleteTable)
 	api.Get("/data", handlers.GetTableData)       // Read
 	api.Post("/data", handlers.InsertData)        // Create
 	api.Delete("/data", handlers.DeleteData)      // Delete

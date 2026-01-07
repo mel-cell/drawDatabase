@@ -82,7 +82,15 @@ const syncFromProps = () => {
 
 // Watchers
 watch(() => props.trigger, syncFromProps);
-watch(() => props.data, syncFromProps, { deep: true, immediate: true });
+watch(
+  () => (props.data ? props.data.id || props.data.data?.name : null),
+  (newId, oldId) => {
+    if (newId !== oldId) {
+      syncFromProps();
+    }
+  },
+  { immediate: true }
+);
 
 // Resize Logic
 const startResize = (e: MouseEvent) => {

@@ -100,7 +100,7 @@ func GetDatabaseSchema(dbName string) (*models.DatabaseSchema, error) {
 	return schema, nil
 }
 
-func CreateTable(req models.CreateTableRequest) error {
+func SyncTable(req models.CreateTableRequest) error {
 	db := database.DB
 
 	// Basic validation
@@ -108,37 +108,86 @@ func CreateTable(req models.CreateTableRequest) error {
 		return fmt.Errorf("table name and columns are required")
 	}
 
-	query := fmt.Sprintf("CREATE TABLE `%s` (", req.Name)
-	var pkColumns []string
+	// 1. Check if table exists
+	var exists bool
+	checkQuery := fmt.Sprintf("SHOW TABLES LIKE '%s'", req.Name)
+	rows, err := db.Raw(checkQuery).Rows()
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	exists = rows.Next()
 
-	// Build column definitions
-	for i, col := range req.Columns {
-		// Basic sanitization should be done here or assumption that this is internal tool
-		query += fmt.Sprintf("`%s` %s", col.Name, col.Type)
+	if !exists {
+		// --- CREATE MODE ---
+		query := fmt.Sprintf("CREATE TABLE `%s` (", req.Name)
+		var pkColumns []string
 
-		if col.IsNotNull {
-			query += " NOT NULL"
+		for i, col := range req.Columns {
+			query += fmt.Sprintf("`%s` %s", col.Name, col.Type)
+
+			if col.IsNotNull {
+				query += " NOT NULL"
+			}
+			if col.IsAutoIncrement {
+				query += " AUTO_INCREMENT"
+			}
+			
+			if col.IsPrimaryKey {
+				pkColumns = append(pkColumns, fmt.Sprintf("`%s`", col.Name))
+			}
+
+			if i < len(req.Columns)-1 {
+				query += ", "
+			}
 		}
-		if col.IsAutoIncrement {
-			query += " AUTO_INCREMENT"
+
+		if len(pkColumns) > 0 {
+			query += fmt.Sprintf(", PRIMARY KEY (%s)", strings.Join(pkColumns, ", "))
+		}
+
+		query += ");"
+		return db.Exec(query).Error
+
+	} else {
+		// --- ALTER/UPDATE MODE ---
+		// Simple strategy: Add missing columns only.
+		// Detailed diffing is complex; this covers 80% of use cases.
+		
+		var existingColumns []struct {
+			Field string
+		}
+		if err := db.Raw(fmt.Sprintf("SHOW COLUMNS FROM `%s`", req.Name)).Scan(&existingColumns).Error; err != nil {
+			return err
+		}
+
+		existingMap := make(map[string]bool)
+		for _, col := range existingColumns {
+			existingMap[col.Field] = true
+		}
+
+		for _, col := range req.Columns {
+			if !existingMap[col.Name] {
+				// ADD COLUMN
+				alterQuery := fmt.Sprintf("ALTER TABLE `%s` ADD COLUMN `%s` %s", req.Name, col.Name, col.Type)
+				if col.IsNotNull {
+					alterQuery += " NOT NULL"
+				}
+				// (Skip AI/PK for Alter for safety, usually added at creation)
+				if err := db.Exec(alterQuery).Error; err != nil {
+					return err 
+				}
+			}
 		}
 		
-		if col.IsPrimaryKey {
-			pkColumns = append(pkColumns, fmt.Sprintf("`%s`", col.Name))
-		}
-
-		if i < len(req.Columns)-1 {
-			query += ", "
-		}
+		return nil
 	}
+}
 
-	// Append Primary Keys definition if any
-	if len(pkColumns) > 0 {
-		query += fmt.Sprintf(", PRIMARY KEY (%s)", strings.Join(pkColumns, ", "))
-	}
-
-	query += ");"
-
-	// Execute
-	return db.Exec(query).Error
+func DropTable(tableName string) error {
+    if tableName == "" {
+        return fmt.Errorf("table name required")
+    }
+    // Safety: Use backticks
+    return database.DB.Exec(fmt.Sprintf("DROP TABLE IF EXISTS `%s`", tableName)).Error
 }

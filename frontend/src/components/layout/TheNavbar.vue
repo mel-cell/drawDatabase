@@ -8,9 +8,6 @@ import {
   Play,
   Settings,
   Database as DatabaseIcon,
-  Network,
-  TerminalSquare,
-  Table2,
   Download,
   User,
   Loader2,
@@ -22,7 +19,7 @@ defineProps<{
 
 defineEmits(["navigate"]);
 
-const { createTable, fetchSchema, currentDatabase } = useSchema(); // Global Active Database
+const { createTable, fetchSchema, currentDatabase, tables } = useSchema(); // Global Active Database
 const { nodes } = useDiagram();
 
 const showAddTableModal = ref(false);
@@ -32,27 +29,29 @@ const isSaving = ref(false);
 const handleSave = async () => {
   const draftTables = nodes.value.filter((n) => n.type === "table");
 
-  if (draftTables.length === 0) {
-    alert("Canvas kosong. Tambahkan tabel dulu.");
-    return;
-  }
-
   if (
     !confirm(
-      `Simpan Schema? Ini akan membuat ${draftTables.length} tabel di database '${currentDatabase.value}'.`
+      `Save Schema? This will SYNC the canvas to database '${currentDatabase.value}'.\n\n- Existing tables will be updated (Columns added)\n- Missing tables will be DELETED\n- New tables will be CREATED`
     )
   )
     return;
 
   isSaving.value = true;
   let successCount = 0;
+  let deleteCount = 0;
 
   try {
+    // 1. Get current server state
+    await fetchSchema();
+    const serverTableNames = new Set(tables.value.map((t) => t.name));
+    const draftTableNames = new Set();
+
+    // 2. Sync (Upsert) Draft Tables
     for (const node of draftTables) {
       const tableData = node.data || {};
       const tableName = tableData.name || tableData.label || "untitled";
+      draftTableNames.add(tableName);
 
-      // Payload ke Backend
       const payload = {
         name: tableName,
         columns: (tableData.columns || []).map((col: any) => ({
@@ -60,6 +59,7 @@ const handleSave = async () => {
           type: col.type,
           is_pk: col.is_pk || false,
           is_nn: col.is_nn || false,
+          is_ai: col.is_ai || false,
         })),
       };
 
@@ -72,11 +72,26 @@ const handleSave = async () => {
       if (res.ok) successCount++;
     }
 
-    await fetchSchema(); // Refresh Sidebar
-    alert(`Berhasil! ${successCount} tabel telah dibuat/diupdate.`);
+    // 3. Delete Removed Tables
+    for (const serverName of serverTableNames) {
+      if (!draftTableNames.has(serverName)) {
+        const res = await fetch(
+          `http://localhost:3000/api/tables?name=${serverName}`,
+          {
+            method: "DELETE",
+          }
+        );
+        if (res.ok) deleteCount++;
+      }
+    }
+
+    await fetchSchema(); // Refresh Sidebar & State
+    alert(
+      `Sync Complete!\n\nSynced/Created: ${successCount}\nDeleted: ${deleteCount}`
+    );
   } catch (e) {
     console.error(e);
-    alert("Gagal menyimpan ke database. Pastikan backend jalan.");
+    alert("Error saving schema. Check backend.");
   } finally {
     isSaving.value = false;
   }

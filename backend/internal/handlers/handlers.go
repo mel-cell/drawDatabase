@@ -43,11 +43,24 @@ func CreateTable(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Invalid request"})
 	}
 
-	if err := services.CreateTable(req); err != nil {
+	if err := services.SyncTable(req); err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	return c.JSON(fiber.Map{"message": "Table created successfully"})
+	return c.JSON(fiber.Map{"message": "Table synced successfully"})
+}
+
+func DeleteTable(c *fiber.Ctx) error {
+	tableName := c.Query("name")
+	if tableName == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "Table name required"})
+	}
+
+	if err := services.DropTable(tableName); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(fiber.Map{"message": "Table deleted successfully"})
 }
 
 func GetTableData(c *fiber.Ctx) error {
