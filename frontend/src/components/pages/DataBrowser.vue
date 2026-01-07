@@ -6,7 +6,6 @@ import {
   Plus,
   Trash2,
   RefreshCw,
-  MoreHorizontal,
   Download,
   Filter,
   ChevronLeft,
@@ -222,7 +221,7 @@ watch(page, fetchData);
             <th
               v-for="col in columns"
               :key="col"
-              class="px-4 py-2 border-b border-gray-200 font-semibold text-gray-600 whitespace-nowrap border-r border-gray-100 last:border-r-0 bg-gray-50"
+              class="px-4 py-2 border-b border-r border-gray-200 font-semibold text-gray-600 whitespace-nowrap last:border-r-0 bg-gray-50"
             >
               {{ col }}
             </th>

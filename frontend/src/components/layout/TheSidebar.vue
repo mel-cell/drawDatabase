@@ -21,10 +21,12 @@ import {
   AlertTriangle,
 } from "lucide-vue-next";
 
-const emit = defineEmits(["select-table", "navigate"]);
+const emit = defineEmits(["select-table", "navigate", "select-database"]);
 
 // State
 const isConnectionModalOpen = ref(false);
+const activeFilter = ref("all");
+const favorites = ref<Set<string>>(new Set());
 const {
   databases,
   tables,
@@ -40,35 +42,53 @@ const contextMenuPos = ref({ x: 0, y: 0 });
 const contextMenuItems = ref<any[]>([]);
 const contextTarget = ref<any>(null);
 
+// Load Favorites
 onMounted(() => {
   fetchDatabases();
+  const saved = localStorage.getItem("drawdb_favorites");
+  if (saved) {
+    try {
+      favorites.value = new Set(JSON.parse(saved));
+    } catch (e) {}
+  }
 });
 
-// -- Logic: Left Click --
+const toggleFavorite = (dbName: string) => {
+  if (favorites.value.has(dbName)) favorites.value.delete(dbName);
+  else favorites.value.add(dbName);
+  localStorage.setItem(
+    "drawdb_favorites",
+    JSON.stringify([...favorites.value])
+  );
+};
+
+// ... (Left Click Logic)
 
 const handleDatabaseClick = async (dbName: string) => {
   if (currentDatabase.value !== dbName) {
     await switchDatabase(dbName);
   }
+  emit("select-database", dbName);
 };
 
 const handleTableClick = (tableName: string) => {
   emit("select-table", tableName);
 };
 
-// -- Logic: Right Click (Context Menu) --
+// ... (Right Click Logic)
 
 const handleContextMenu = (
   e: MouseEvent,
-  type: "database" | "table",
+  type: "database" | "table" | "folder-table",
   data: any
 ) => {
-  // TreeNode has already prevented default. e is the native MouseEvent.
   contextTarget.value = { type, data };
   contextMenuPos.value = { x: e.clientX, y: e.clientY };
 
   if (type === "database") {
     const isCurrent = currentDatabase.value === data;
+    const isFav = favorites.value.has(data);
+
     contextMenuItems.value = [
       {
         label: "Set as Active",
@@ -76,9 +96,21 @@ const handleContextMenu = (
         icon: Database,
         disabled: isCurrent,
       },
-      { label: "New Table...", action: "create_table", icon: Plus },
+      {
+        label: isFav ? "Remove from Favorites" : "Add to Favorites",
+        action: "toggle_fav",
+        icon: isFav ? Trash2 : Folder, // Or Star icon if imported
+      },
+      { type: "divider" },
+      {
+        label: "New Table...",
+        action: "create_table",
+        icon: Plus,
+        disabled: !isCurrent,
+      },
       { label: "Rename Database", action: "rename_db", icon: Edit },
       { label: "Refresh", action: "refresh_db", icon: RefreshCw },
+      { type: "divider" },
       { label: "Drop Database", action: "drop_db", danger: true, icon: Trash2 },
     ];
   } else if (type === "table") {
@@ -92,6 +124,11 @@ const handleContextMenu = (
       },
       { label: "Drop Table", action: "drop_table", danger: true, icon: Trash2 },
     ];
+  } else if (type === "folder-table") {
+    contextMenuItems.value = [
+      { label: "Create New Table", action: "create_table", icon: Plus },
+      { label: "Refresh Tables", action: "refresh_db", icon: RefreshCw },
+    ];
   }
 
   contextMenuVisible.value = true;
@@ -99,19 +136,49 @@ const handleContextMenu = (
 
 const handleContextSelect = async (action: string) => {
   const target = contextTarget.value;
-  console.log("Context Action:", action, target);
 
+  if (action === "toggle_fav") {
+    toggleFavorite(target.data);
+  }
+  // Common Actions
+  else if (action === "create_table") {
+    alert(
+      "To create a table, please click the 'New Table' tool in the floating toolbar on the diagram."
+    );
+  }
   // Database Actions
-  if (action === "use_db") {
+  else if (action === "use_db") {
     await switchDatabase(target.data);
   } else if (action === "refresh_db") {
-    if (target.data === currentDatabase.value) await fetchSchema();
-    else alert(`To refresh ${target.data}, please switch to it first.`);
+    await fetchSchema();
   } else if (action === "rename_db") {
     const newName = prompt("Enter new database name:", target.data);
     if (newName && newName !== target.data) {
-      // Call rename API
-      alert(`Renaming ${target.data} to ${newName} (Backend impl needed)`);
+      try {
+        const res = await fetch("http://localhost:3000/api/databases/rename", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ old_name: target.data, new_name: newName }),
+        });
+        if (res.ok) {
+          // Update favorites if renamed
+          if (favorites.value.has(target.data)) {
+            favorites.value.delete(target.data);
+            favorites.value.add(newName);
+            localStorage.setItem(
+              "drawdb_favorites",
+              JSON.stringify([...favorites.value])
+            );
+          }
+          alert("Database renamed!");
+          location.reload();
+        } else {
+          const err = await res.json();
+          alert("Error: " + err.error);
+        }
+      } catch (e) {
+        console.error(e);
+      }
     }
   } else if (action === "drop_db") {
     if (
@@ -119,16 +186,40 @@ const handleContextSelect = async (action: string) => {
         `⚠️ WARNING: Drop database '${target.data}'?\nAll tables and data will be lost permanently!`
       )
     ) {
-      alert("Delete request sent (Backend impl needed)");
+      await fetch(`http://localhost:3000/api/databases?name=${target.data}`, {
+        method: "DELETE",
+      });
+      // Remove from favs
+      if (favorites.value.has(target.data)) {
+        favorites.value.delete(target.data);
+        localStorage.setItem(
+          "drawdb_favorites",
+          JSON.stringify([...favorites.value])
+        );
+      }
+      alert("Database dropped");
+      location.reload();
     }
   }
-
-  // Table Actions
+  // ... rest of actions
   else if (action === "view_data") {
-    emit("select-table", target.data);
+    emit("select-table", target.data); // Navigate to browse
+    emit("navigate", "data");
   } else if (action === "drop_table") {
     if (confirm(`Drop table '${target.data}'?`)) {
-      alert("Drop Table request sent (Backend impl needed)");
+      await fetch(`http://localhost:3000/api/tables?name=${target.data}`, {
+        method: "DELETE",
+      });
+      await fetchSchema();
+    }
+  } else if (action === "truncate_table") {
+    if (confirm(`Truncate table '${target.data}'? All rows will be deleted.`)) {
+      await fetch("http://localhost:3000/api/execute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: `TRUNCATE TABLE \`${target.data}\`` }),
+      });
+      alert("Table truncated.");
     }
   }
 
@@ -174,12 +265,24 @@ const handleContextSelect = async (action: string) => {
       </div>
       <div class="flex gap-2 mt-2 px-1">
         <button
-          class="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100"
+          @click="activeFilter = 'all'"
+          class="text-[10px] px-2 py-0.5 rounded border transition-colors"
+          :class="
+            activeFilter === 'all'
+              ? 'bg-blue-50 border-blue-100 text-blue-600 font-bold'
+              : 'bg-transparent border-transparent text-gray-500 hover:text-gray-700'
+          "
         >
           All
         </button>
         <button
-          class="text-[10px] font-medium text-gray-500 hover:text-gray-700 px-2 py-0.5"
+          @click="activeFilter = 'fav'"
+          class="text-[10px] px-2 py-0.5 rounded border transition-colors"
+          :class="
+            activeFilter === 'fav'
+              ? 'bg-blue-50 border-blue-100 text-blue-600 font-bold'
+              : 'bg-transparent border-transparent text-gray-500 hover:text-gray-700'
+          "
         >
           Favorites
         </button>
@@ -191,17 +294,27 @@ const handleContextSelect = async (action: string) => {
       <!-- Database List -->
       <div v-for="db in databases" :key="db">
         <TreeNode
+          v-if="activeFilter === 'all' || favorites.has(db)"
           :label="db"
           :has-children="true"
-          :start-expanded="db === currentDatabase"
+          :is-open="db === currentDatabase"
           @contextmenu="(e: MouseEvent) => handleContextMenu(e, 'database', db)"
           @click="handleDatabaseClick(db)"
         >
           <template #icon>
-            <Database
-              class="w-3.5 h-3.5 text-yellow-600"
-              :class="{ 'fill-yellow-100': db === currentDatabase }"
-            />
+            <div class="relative">
+              <Database
+                class="w-3.5 h-3.5 text-yellow-600"
+                :class="{ 'fill-yellow-100': db === currentDatabase }"
+              />
+              <!-- Fav Star -->
+              <div
+                v-if="favorites.has(db)"
+                class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-white flex items-center justify-center"
+              >
+                <div class="w-1.5 h-1.5 bg-yellow-400 rounded-full"></div>
+              </div>
+            </div>
           </template>
 
           <!-- Tables inside active DB -->
@@ -213,7 +326,8 @@ const handleContextSelect = async (action: string) => {
             <TreeNode
               label="Tables"
               :has-children="true"
-              :start-expanded="true"
+              :is-open="true"
+              @contextmenu.stop="(e: MouseEvent) => handleContextMenu(e, 'folder-table', null)"
             >
               <template #icon
                 ><Folder class="w-3.5 h-3.5 text-blue-400 fill-blue-50"

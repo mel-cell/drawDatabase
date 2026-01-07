@@ -23,7 +23,7 @@ export interface RelationSchema {
 const tables = ref<TableSchema[]>([]);
 const relations = ref<RelationSchema[]>([]);
 const databases = ref<string[]>([]);
-const currentDatabase = ref<string>("draw_db"); // Default
+const currentDatabase = ref<string>(""); // Default empty
 
 export function useSchema() {
   const fetchDatabases = async () => {

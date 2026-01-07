@@ -3,7 +3,15 @@ package models
 type CreateTableRequest struct {
 	Name    string          `json:"name"`
 	Columns []ColumnDefinition `json:"columns"`
-	// Indexes []IndexDefinition `json:"indexes,omitempty"`
+	ForeignKeys []ForeignKeyDefinition `json:"foreign_keys,omitempty"`
+}
+
+type ForeignKeyDefinition struct {
+	ColumnName    string `json:"column_name"`
+	RefTableName  string `json:"ref_table_name"`
+	RefColumnName string `json:"ref_column_name"`
+	OnDelete      string `json:"on_delete,omitempty"`
+	OnUpdate      string `json:"on_update,omitempty"`
 }
 
 type ColumnDefinition struct {

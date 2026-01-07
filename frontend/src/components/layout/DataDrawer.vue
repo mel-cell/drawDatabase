@@ -1,10 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, onUnmounted } from "vue";
-import {
-  X,
-  RefreshCw,
-  Plus,
-} from "lucide-vue-next";
+import { X, RefreshCw, Plus } from "lucide-vue-next";
 
 const props = defineProps<{
   isOpen: boolean;
@@ -32,38 +28,54 @@ watch(
   }
 );
 
-// Mock Data
-const columns = ref(["id", "username", "email", "status", "created_at"]);
-const rows = ref([
-  {
-    id: 1,
-    username: "admin",
-    email: "admin@drawdb.com",
-    status: "active",
-    created_at: "2024-01-01 10:00:00",
-  },
-  {
-    id: 2,
-    username: "john_doe",
-    email: "john@gmail.com",
-    status: "inactive",
-    created_at: "2024-01-02 11:30:00",
-  },
-  {
-    id: 3,
-    username: "jane_smith",
-    email: "jane@yahoo.com",
-    status: "active",
-    created_at: "2024-01-03 09:15:00",
-  },
-  {
-    id: 4,
-    username: "guest_01",
-    email: "guest@temp.com",
-    status: "pending",
-    created_at: "2024-01-04 14:20:00",
-  },
-]);
+// Real Data State
+const loading = ref(false);
+const error = ref("");
+const columns = ref<string[]>([]);
+const rows = ref<any[]>([]);
+const total = ref(0);
+const page = ref(1);
+const limit = ref(50);
+
+const fetchData = async () => {
+  if (!props.tableName) return;
+  loading.value = true;
+  error.value = "";
+
+  try {
+    const res = await fetch(
+      `http://localhost:3000/api/data?table=${props.tableName}&page=${page.value}&limit=${limit.value}`
+    );
+    if (!res.ok) throw new Error("Failed to fetch");
+    const data = await res.json();
+    columns.value = data.columns || [];
+    rows.value = data.rows || [];
+    total.value = data.total || 0;
+  } catch (e: any) {
+    error.value = e.message;
+  } finally {
+    loading.value = false;
+  }
+};
+
+watch(
+  () => props.tableName,
+  () => {
+    if (props.isOpen && props.tableName) fetchData();
+  }
+);
+
+watch(
+  () => props.isOpen,
+  (newVal) => {
+    if (newVal) {
+      drawerHeight.value = 300;
+      if (props.tableName) fetchData();
+    } else {
+      drawerHeight.value = 24;
+    }
+  }
+);
 
 const startDrag = (e: MouseEvent) => {
   isDragging.value = true;

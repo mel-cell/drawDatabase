@@ -8,15 +8,20 @@ import DataBrowser from "./components/pages/DataBrowser.vue";
 import UserManagement from "./components/pages/admin/UserManagement.vue";
 import DataDrawer from "./components/layout/DataDrawer.vue";
 import ContextPanel from "./components/layout/ContextPanel.vue";
+import { useSchema } from "./composables/useSchema";
 
+const { currentDatabase } = useSchema();
 const isDataDrawerOpen = ref(false);
 const selectedTableForData = ref("");
 const selectedNodeData = ref<any>(null); // For Right Sidebar Property Editor
+const selectedDatabase = ref<string>("");
 const selectionTimestamp = ref(0); // Trigger to force reopen panel
 const activePage = ref("diagram");
 
 const handleTableSelect = (tableName: string) => {
   selectedTableForData.value = tableName;
+  selectedDatabase.value = "";
+  selectedNodeData.value = null;
 
   if (activePage.value === "diagram") {
     // In Diagram mode, open bottom drawer
@@ -27,6 +32,13 @@ const handleTableSelect = (tableName: string) => {
   }
 };
 
+const handleDatabaseSelect = (dbName: string) => {
+  selectedDatabase.value = dbName;
+  selectedTableForData.value = "";
+  selectedNodeData.value = null;
+  selectionTimestamp.value = Date.now();
+};
+
 const handleNodeSelect = (node: any) => {
   // Canvas Node Click -> Open Context Panel (Right)
   if (!node) {
@@ -34,6 +46,7 @@ const handleNodeSelect = (node: any) => {
     return;
   }
   selectedNodeData.value = node;
+  selectedDatabase.value = "";
   selectionTimestamp.value = Date.now(); // Force update trigger
 };
 
@@ -50,6 +63,7 @@ const handleNavigation = (page: string) => {
       <!-- Sidebar always visible for object explorer -->
       <TheSidebar
         @select-table="handleTableSelect"
+        @select-database="handleDatabaseSelect"
         @navigate="handleNavigation"
       />
 
@@ -119,22 +133,15 @@ const handleNavigation = (page: string) => {
         v-if="activePage === 'diagram'"
         class="shrink-0"
         :trigger="selectionTimestamp"
+        :active-database="selectedDatabase"
         :type="
           selectedNodeData
             ? selectedNodeData.type === 'custom-note'
               ? 'note-edit'
               : 'table-edit'
-            : selectedTableForData
-            ? 'table'
-            : 'server'
+            : 'none'
         "
-        :data="
-          selectedNodeData
-            ? selectedNodeData
-            : selectedTableForData
-            ? { name: selectedTableForData }
-            : null
-        "
+        :data="selectedNodeData"
       />
     </div>
   </div>

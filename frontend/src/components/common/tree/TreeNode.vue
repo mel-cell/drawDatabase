@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watch } from "vue";
 
 const props = defineProps<{
   label: string;
@@ -11,6 +11,13 @@ const props = defineProps<{
 const emit = defineEmits(["toggle", "click", "contextmenu"]);
 
 const isOpen = ref(props.isOpen || false);
+
+watch(
+  () => props.isOpen,
+  (newVal) => {
+    isOpen.value = newVal || false;
+  }
+);
 
 const toggle = () => {
   if (props.hasChildren) {

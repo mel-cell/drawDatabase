@@ -26,7 +26,7 @@ export function useDiagram() {
     return t;
   };
 
-  const syncDiagram = (forceReset = false) => {
+  const syncDiagram = async (forceReset = false) => {
     // Layout Config
     let x = 100;
     let y = 100;
@@ -35,21 +35,39 @@ export function useDiagram() {
     const COLS_PER_ROW = 3;
 
     // Reset if forced (e.g. DB change)
-    if (forceReset) {
+    if (forceReset || tables.value.length === 0) {
       nodes.value = [];
       edges.value = [];
     }
 
     // Only sync if nodes are empty (initial load or after reset) to avoid overwriting drags
     if (nodes.value.length === 0 && tables.value.length > 0) {
+      // Fetch Layout
+      let savedLayouts: any = {};
+      try {
+        const res = await fetch("http://localhost:3000/api/layout");
+        if (res.ok) savedLayouts = await res.json();
+      } catch (e) {
+        console.warn("No layout found");
+      }
+
       nodes.value = tables.value.map((table: TableSchema, index: number) => {
         const col = index % COLS_PER_ROW;
         const row = Math.floor(index / COLS_PER_ROW);
 
+        // Use saved position or calculate new one
+        let posX = x + col * GAP_X;
+        let posY = y + row * GAP_Y;
+
+        if (savedLayouts[table.name]) {
+          posX = savedLayouts[table.name].x;
+          posY = savedLayouts[table.name].y;
+        }
+
         return {
           id: table.name,
           type: "table",
-          position: { x: x + col * GAP_X, y: y + row * GAP_Y },
+          position: { x: posX, y: posY },
           data: {
             name: table.name, // Ensure consistent naming logic
             label: table.name,
@@ -84,8 +102,13 @@ export function useDiagram() {
 
   // Initial Fetch
   onMounted(async () => {
-    if (tables.value.length === 0) await fetchSchema();
-    syncDiagram();
+    if (currentDatabase.value) {
+      if (tables.value.length === 0) await fetchSchema();
+      syncDiagram();
+    } else {
+      nodes.value = [];
+      edges.value = [];
+    }
   });
 
   // Watch for Database Switch

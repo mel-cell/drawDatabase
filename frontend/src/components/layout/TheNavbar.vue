@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import AddTableModal from "../modals/AddTableModal.vue";
+import CreateDatabaseModal from "../modals/CreateDatabaseModal.vue";
+import ImportModal from "../modals/ImportModal.vue";
+import ExportModal from "../modals/ExportModal.vue";
+import ConfirmModal from "../modals/ConfirmModal.vue";
 import { useSchema } from "../../composables/useSchema";
 import { useDiagram } from "../../composables/useDiagram";
 import {
@@ -11,6 +15,7 @@ import {
   Download,
   User,
   Loader2,
+  Upload,
 } from "lucide-vue-next";
 
 defineProps<{
@@ -20,23 +25,97 @@ defineProps<{
 defineEmits(["navigate"]);
 
 const { createTable, fetchSchema, currentDatabase, tables } = useSchema(); // Global Active Database
-const { nodes } = useDiagram();
+const { nodes, edges } = useDiagram();
 
 const showAddTableModal = ref(false);
 const isSaving = ref(false);
 
+const showCreateDBModal = ref(false);
+const showImportModal = ref(false);
+const showExportModal = ref(false);
+const showConfirmModal = ref(false);
+
+const confirmConfig = ref({
+  title: "",
+  message: "",
+  isDanger: false,
+  confirmLabel: "Confirm",
+  onConfirm: () => {},
+});
+
+const executeConfirmAction = () => {
+  confirmConfig.value.onConfirm();
+  showConfirmModal.value = false;
+};
+
+// --- HANDLERS ---
+
+const handleCreateDatabase = () => {
+  showCreateDBModal.value = true;
+};
+
+const executeCreateDatabase = async (name: string) => {
+  try {
+    const res = await fetch("http://localhost:3000/api/databases", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+
+    if (res.ok) {
+      // alert(`Database '${name}' created!`);
+      // Close modal implicitly by success
+      showCreateDBModal.value = false;
+      await fetchSchema(); // Refresh sidebar list
+    } else {
+      const err = await res.json();
+      alert(`Failed: ${err.error}`); // Keep alert for error or use toast later
+    }
+  } catch (e) {
+    console.error(e);
+    alert("Network error");
+  }
+};
+
+const handleImport = () => {
+  showImportModal.value = true;
+};
+
+const executeImport = (file: File) => {
+  console.log("Importing:", file);
+  alert(`Mock Import: ${file?.name} uploaded.`);
+  showImportModal.value = false;
+};
+
+const handleExport = () => {
+  showExportModal.value = true;
+};
+
+const executeExport = (format: string) => {
+  console.log("Exporting as:", format);
+  alert(`Mock Export: Downloading as ${format.toUpperCase()}...`);
+  showExportModal.value = false;
+};
+
 // Logic: Mengubah Gambar Canvas -> Tabel Nyata di Database
-const handleSave = async () => {
+const handleSave = () => {
   const draftTables = nodes.value.filter((n) => n.type === "table");
 
-  if (
-    !confirm(
-      `Save Schema? This will SYNC the canvas to database '${currentDatabase.value}'.\n\n- Existing tables will be updated (Columns added)\n- Missing tables will be DELETED\n- New tables will be CREATED`
-    )
-  )
-    return;
+  confirmConfig.value = {
+    title: "Save Schema Synchronization",
+    message: `This will SYNC the canvas to database '${currentDatabase.value}'.\n\n• Existing tables will be updated (Columns added)\n• Missing tables will be DELETED\n• New tables will be CREATED`,
+    isDanger: true,
+    confirmLabel: "Sync Database",
+    onConfirm: async () => {
+      isSaving.value = true;
+      await performSave(draftTables);
+    },
+  };
+  showConfirmModal.value = true;
+};
 
-  isSaving.value = true;
+const performSave = async (draftTables: any[]) => {
+  // Existing Save Logic (Moved here)
   let successCount = 0;
   let deleteCount = 0;
 
@@ -52,6 +131,43 @@ const handleSave = async () => {
       const tableName = tableData.name || tableData.label || "untitled";
       draftTableNames.add(tableName);
 
+      // 3. Find Relations
+      // A) Visual Edges (where this table is SOURCE)
+      const visualFKs = edges.value
+        .filter((e: any) => e.source === tableName)
+        .map((edge: any) => {
+          const sourceCol = edge.sourceHandle
+            ? edge.sourceHandle.replace("source-", "")
+            : "";
+          const targetCol = edge.targetHandle
+            ? edge.targetHandle.replace("target-", "")
+            : "";
+          return {
+            column_name: sourceCol,
+            ref_table_name: edge.target,
+            ref_column_name: targetCol,
+            on_delete: "CASCADE",
+          };
+        })
+        .filter((fk: any) => fk.column_name && fk.ref_column_name);
+
+      // B) Manual Column FKs (from ContextPanel)
+      const manualFKs = (tableData.columns || [])
+        .filter((c: any) => c.is_fk && c.fk_ref_table && c.fk_ref_col)
+        .map((c: any) => ({
+          column_name: c.name,
+          ref_table_name: c.fk_ref_table,
+          ref_column_name: c.fk_ref_col,
+          on_delete: c.fk_on_delete || "RESTRICT",
+        }));
+
+      // Merge (Unique by column name)
+      const allFKs = [...visualFKs, ...manualFKs];
+      // Dedupe by column_name
+      const foreignKeys = Array.from(
+        new Map(allFKs.map((item) => [item.column_name, item])).values()
+      );
+
       const payload = {
         name: tableName,
         columns: (tableData.columns || []).map((col: any) => ({
@@ -61,6 +177,7 @@ const handleSave = async () => {
           is_nn: col.is_nn || false,
           is_ai: col.is_ai || false,
         })),
+        foreign_keys: foreignKeys,
       };
 
       const res = await fetch("http://localhost:3000/api/tables", {
@@ -85,6 +202,23 @@ const handleSave = async () => {
       }
     }
 
+    // 4. Save Layout
+    const layouts: any = {};
+    nodes.value.forEach((node) => {
+      if (node.type === "table") {
+        layouts[node.data.name || node.data.label] = {
+          x: Math.round(node.position.x),
+          y: Math.round(node.position.y),
+        };
+      }
+    });
+
+    await fetch("http://localhost:3000/api/layout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(layouts),
+    });
+
     await fetchSchema(); // Refresh Sidebar & State
     alert(
       `Sync Complete!\n\nSynced/Created: ${successCount}\nDeleted: ${deleteCount}`
@@ -101,31 +235,6 @@ const handleCreateTable = async (data: any) => {
   const success = await createTable(data);
   if (success) {
     showAddTableModal.value = false;
-  }
-};
-
-const handleCreateDatabase = async () => {
-  const name = prompt("Enter new database name:");
-  if (!name) return;
-
-  // Prevent space or special char if needed
-  try {
-    const res = await fetch("http://localhost:3000/api/databases", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
-    });
-
-    if (res.ok) {
-      alert(`Database '${name}' created!`);
-      await fetchSchema(); // Refresh sidebar list
-    } else {
-      const err = await res.json();
-      alert(`Failed: ${err.error}`);
-    }
-  } catch (e) {
-    console.error(e);
-    alert("Network error");
   }
 };
 </script>
@@ -222,6 +331,14 @@ const handleCreateDatabase = async () => {
         </button>
 
         <button
+          @click="handleImport"
+          class="p-1.5 text-gray-600 hover:bg-gray-100 rounded hover:text-blue-600"
+          title="Import Diagram"
+        >
+          <Upload class="w-4 h-4" />
+        </button>
+        <button
+          @click="handleExport"
           class="p-1.5 text-gray-600 hover:bg-gray-100 rounded hover:text-blue-600"
           title="Export Diagram"
         >
@@ -279,6 +396,34 @@ const handleCreateDatabase = async () => {
       :is-open="showAddTableModal"
       @close="showAddTableModal = false"
       @create="handleCreateTable"
+    />
+
+    <CreateDatabaseModal
+      :is-open="showCreateDBModal"
+      @close="showCreateDBModal = false"
+      @create="executeCreateDatabase"
+    />
+
+    <ImportModal
+      :is-open="showImportModal"
+      @close="showImportModal = false"
+      @import="executeImport"
+    />
+
+    <ExportModal
+      :is-open="showExportModal"
+      @close="showExportModal = false"
+      @export="executeExport"
+    />
+
+    <ConfirmModal
+      :is-open="showConfirmModal"
+      :title="confirmConfig.title"
+      :message="confirmConfig.message"
+      :is-danger="confirmConfig.isDanger"
+      :confirm-label="confirmConfig.confirmLabel"
+      @close="showConfirmModal = false"
+      @confirm="executeConfirmAction"
     />
   </header>
 </template>
