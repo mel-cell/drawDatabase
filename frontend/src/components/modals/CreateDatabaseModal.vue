@@ -54,7 +54,7 @@ const handleCreate = () => {
           @keyup.enter="handleCreate"
           type="text"
           placeholder="e.g. ecommerce_db"
-          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
           autofocus
         />
         <p class="text-[10px] text-gray-400 mt-2">

@@ -374,7 +374,7 @@ const handleDeleteTable = () => {
               >
               <input
                 v-model="tablename"
-                class="w-full text-sm font-bold border border-gray-300 rounded px-2 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-200 outline-none"
+                class="w-full text-sm font-bold border border-gray-300 rounded px-2 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-200 outline-none text-gray-900"
                 placeholder="e.g. users"
               />
             </div>
@@ -484,12 +484,12 @@ const handleDeleteTable = () => {
                 </button>
                 <input
                   v-model="col.name"
-                  class="flex-1 min-w-0 bg-white border border-gray-200 rounded px-1.5 py-1 text-xs font-medium focus:border-blue-400 outline-none"
+                  class="flex-1 min-w-0 bg-white border border-gray-200 rounded px-1.5 py-1 text-xs font-medium focus:border-blue-400 outline-none text-gray-700"
                   placeholder="name"
                 />
                 <select
                   v-model="col.type"
-                  class="w-20 bg-white border border-gray-200 rounded px-1 py-1 text-[10px] font-mono focus:border-blue-400 outline-none"
+                  class="w-20 bg-white border border-gray-200 rounded px-1 py-1 text-[10px] font-mono focus:border-blue-400 outline-none text-gray-700"
                 >
                   <optgroup label="Numeric">
                     <option>INT</option>
@@ -580,7 +580,7 @@ const handleDeleteTable = () => {
                   >
                   <input
                     v-model="col.default"
-                    class="w-full text-xs border border-gray-200 rounded px-1 py-0.5 bg-white outline-none focus:border-blue-400"
+                    class="w-full text-xs border border-gray-200 rounded px-1 py-0.5 bg-white outline-none focus:border-blue-400 text-gray-700"
                     placeholder="NULL"
                   />
                 </div>
@@ -691,7 +691,7 @@ const handleDeleteTable = () => {
             >
             <textarea
               v-model="noteLabel"
-              class="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-200 outline-none resize-y min-h-[100px]"
+              class="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-200 outline-none resize-y min-h-[100px] text-gray-900"
               placeholder="Enter note text..."
             ></textarea>
           </div>
@@ -775,7 +775,7 @@ const handleDeleteTable = () => {
             <input
               v-model="groupLabel"
               type="text"
-              class="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-200 outline-none"
+              class="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-200 outline-none text-gray-900"
               placeholder="e.g. Auth Module"
             />
           </div>
@@ -794,7 +794,7 @@ const handleDeleteTable = () => {
               <input
                 v-model="groupColor"
                 type="text"
-                class="flex-1 text-xs border border-gray-300 rounded px-2 py-1.5 bg-gray-50 font-mono"
+                class="flex-1 text-xs border border-gray-300 rounded px-2 py-1.5 bg-gray-50 font-mono text-gray-700"
               />
             </div>
           </div>

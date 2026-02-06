@@ -204,9 +204,7 @@ const handleToolAction = (action: string) => {
         backgroundColor: "rgba(240, 244, 248, 0.5)",
         border: "2px dashed #cbd5e1",
         borderRadius: "8px",
-        zIndex: -1,
-        resize: "both",
-        overflow: "visible",
+        zIndex: -10, // Make sure it is behind
       },
     });
     recordHistory();

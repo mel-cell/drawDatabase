@@ -142,7 +142,7 @@ const handleCreate = () => {
               v-model="tableName"
               type="text"
               placeholder="e.g. users"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all placeholder:font-normal"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all placeholder:font-normal"
               autofocus
             />
           </div>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Handle, Position } from "@vue-flow/core";
+import { NodeResizer } from "@vue-flow/node-resizer";
 import { useDiagram } from "../../composables/useDiagram";
 import { X } from "lucide-vue-next";
 
@@ -16,8 +17,19 @@ const { removeNode } = useDiagram();
 </script>
 
 <template>
-  <div class="group-node w-full h-full relative group">
-    <!-- Handles (Hidden) -->
+  <div
+    class="group-node w-full h-full relative group rounded-lg"
+    :style="{ backgroundColor: props.data.color || 'rgba(240, 244, 248, 0.5)' }"
+  >
+    <NodeResizer
+      :min-width="150"
+      :min-height="150"
+      :is-visible="selected"
+      line-class-name="!border-blue-400"
+      handle-class-name="!bg-blue-400"
+    />
+
+    <!-- Handles (Hidden but needed for connections if any) -->
     <Handle type="target" :position="Position.Top" class="!opacity-0" />
     <Handle type="source" :position="Position.Bottom" class="!opacity-0" />
 
@@ -38,15 +50,14 @@ const { removeNode } = useDiagram();
       {{ props.data.label }}
     </div>
 
-    <!-- The actual visual box is handled by the parent wrapper style, 
-         but we can add a subtle inner border or effect if selected -->
+    <!-- Inner Border for Selection -->
     <div
-      class="w-full h-full border-2 border-transparent transition-colors rounded-lg pointer-events-none"
-      :class="{ '!border-blue-400': selected }"
+      class="w-full h-full border-2 border-dashed transition-colors rounded-lg pointer-events-none"
+      :class="selected ? 'border-blue-400' : 'border-slate-300'"
     ></div>
   </div>
 </template>
 
-<style scoped>
-/* No styles needed yet */
+<style>
+@import "@vue-flow/node-resizer/dist/style.css";
 </style>
