@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
 import { useDiagram } from "../../composables/useDiagram";
+import { useToast } from "../../composables/useToast";
 import {
   X,
   Database,
   Table as TableIcon,
   ChevronRight,
   Info,
+  Layers,
+  Settings,
+  Trash2,
 } from "lucide-vue-next";
 
 // Import Modular Editors
@@ -22,7 +26,8 @@ const props = defineProps<{
 }>();
 
 const { removeNode, nodes } = useDiagram();
-const isExpanded = ref(false);
+const toast = useToast();
+const isExpanded = ref(true);
 const activeTab = ref<string>("info");
 const panelWidth = ref(360);
 const isResizing = ref(false);
@@ -73,112 +78,141 @@ const handleUpdate = (updatedData: any) => {
 };
 
 const handleDelete = () => {
-  if (confirm("Are you sure you want to remove this item?")) {
-    const id = props.data.id;
-    if (id) {
-      removeNode(id);
-      isExpanded.value = false;
-    }
+  const id = props.data?.id;
+  if (id) {
+    removeNode(id);
+    toast.warning("Element Removed", "Diagram has been updated");
   }
 };
 </script>
 
 <template>
-  <div class="flex h-full z-30 shadow-2xl bg-white border-l border-gray-200 overflow-hidden">
-    <!-- Slim Sidebar Bar (TABS) -->
-    <div class="w-12 bg-white h-full flex flex-col items-center py-6 gap-6 z-40 relative border-r border-gray-100 flex-shrink-0">
+  <div class="flex h-full bg-white border-l border-gray-200 overflow-hidden relative shadow-2xl">
+    
+    <!-- SLIM TOOLBAR TAB - Fixed Width -->
+    <div class="w-14 bg-gray-50 border-r border-gray-100 h-full flex flex-col items-center py-6 gap-4 z-10 flex-shrink-0">
       <button 
         @click="activeTab = 'database'; isExpanded = true"
-        class="p-2.5 rounded-xl transition-all relative group"
-        :class="activeTab === 'database' && isExpanded ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:bg-gray-100'"
+        class="w-10 h-10 flex-center rounded-xl transition-all relative group"
+        :class="activeTab === 'database' && isExpanded ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'text-gray-400 hover:bg-white hover:text-gray-900 border border-transparent'"
       >
-        <Database class="w-5 h-5" />
+        <Database class="w-4.5 h-4.5" />
+        <div class="absolute left-16 px-2 py-1 bg-gray-900 text-white text-[9px] font-bold rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-all">Database Info</div>
       </button>
 
       <button 
         @click="activeTab = 'info'; isExpanded = true"
-        class="p-2.5 rounded-xl transition-all relative group"
-        :class="activeTab === 'info' && isExpanded ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:bg-gray-100'"
+        class="w-10 h-10 flex-center rounded-xl transition-all relative group"
+        :class="activeTab === 'info' && isExpanded ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'text-gray-400 hover:bg-white hover:text-gray-900 border border-transparent'"
         :disabled="type === 'none'"
       >
-        <TableIcon class="w-5 h-5" :class="{ 'opacity-50': type === 'none' }" />
+        <Layers class="w-4.5 h-4.5" :class="{ 'opacity-30': type === 'none' }" />
+        <div class="absolute left-16 px-2 py-1 bg-gray-900 text-white text-[9px] font-bold rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none transition-all">Properties</div>
       </button>
 
       <div class="flex-1"></div>
 
-      <button @click="isExpanded = !isExpanded" class="p-2 mb-4 rounded-lg text-gray-400 hover:bg-gray-100">
-        <ChevronRight class="w-5 h-5 transition-transform duration-300" :class="{ 'rotate-180': !isExpanded }" />
+      <button @click="isExpanded = !isExpanded" class="w-10 h-10 flex-center rounded-xl text-gray-400 hover:bg-white transition-all">
+        <ChevronRight class="w-4.5 h-4.5 transition-transform duration-500" :class="{ 'rotate-180': !isExpanded }" />
       </button>
     </div>
 
-    <!-- Expanded Content Area -->
-    <transition name="panel-slide">
-      <aside 
+    <!-- MAIN CONTENT AREA -->
+    <Transition
+      enter-active-class="transition-all duration-300 ease-out"
+      leave-active-class="transition-all duration-200 ease-in"
+      enter-from-class="opacity-0 translate-x-4"
+      enter-to-class="opacity-100 translate-x-0"
+    >
+      <div 
         v-if="isExpanded"
-        class="bg-white h-full flex flex-col relative"
+        class="flex flex-col h-full bg-white relative"
         :style="{ width: panelWidth + 'px' }"
       >
-        <!-- Resize Handle -->
+        <!-- Resize Handle (Invisibly wide, visibily thin) -->
         <div 
           @mousedown.prevent="startResize"
-          class="absolute top-0 bottom-0 left-0 w-1.5 bg-transparent hover:bg-blue-400 cursor-ew-resize z-50 transition-all opacity-0 hover:opacity-100"
-          :class="{ 'bg-blue-400 opacity-100': isResizing }"
-        ></div>
+          class="absolute top-0 bottom-0 left-0 w-1 cursor-ew-resize z-50 group"
+        >
+           <div class="h-full w-full bg-blue-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+        </div>
 
-        <!-- Header -->
-        <header class="h-14 flex items-center justify-between px-5 bg-gray-50/50 border-b border-gray-100 flex-shrink-0">
-          <div class="flex items-center gap-2">
-            <h3 class="font-bold text-[10px] uppercase tracking-[0.1em] text-gray-400">
-                {{ type === 'database' ? 'Database Detail' : 'Properties' }}
-            </h3>
+        <!-- Panel Header -->
+        <header class="h-14 flex items-center justify-between px-6 border-b border-gray-100 flex-shrink-0">
+          <div class="flex flex-col">
+            <h2 class="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600">
+                {{ activeTab === 'database' ? 'Connection' : 'Active Element' }}
+            </h2>
+            <span class="text-xs font-bold text-gray-400 truncate max-w-[200px]">
+               {{ type === 'none' ? 'Workspace Explorer' : (data?.data?.name || data?.data?.label || type) }}
+            </span>
           </div>
-          <button @click="isExpanded = false" class="p-1.5 rounded-lg hover:bg-gray-200 text-gray-400">
-            <X class="w-4 h-4" />
-          </button>
+          
+          <div class="flex items-center gap-2">
+             <button v-if="type !== 'none'" @click="handleDelete" class="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title="Delete Object">
+               <Trash2 class="w-4 h-4" />
+             </button>
+             <button @click="isExpanded = false" class="p-2 bg-gray-50 text-gray-400 hover:text-gray-900 rounded-lg transition-all">
+               <X class="w-4 h-4" />
+             </button>
+          </div>
         </header>
 
-        <!-- Dynamic Content -->
-        <div class="flex-1 overflow-y-auto p-6 bg-white scrollbar-thin">
-          <!-- TABLE EDITOR -->
-          <TableEditor 
-            v-if="activeTab === 'info' && (type === 'table' || type === 'table-edit')" 
-            :data="data" 
-            :nodes="nodes"
-            @update="handleUpdate"
-          />
+        <!-- Editor Content -->
+        <div class="flex-1 overflow-y-auto p-6 scrollbar-thin">
+           <!-- Render appropriate editor -->
+           <div v-if="type !== 'none' || activeTab === 'database'">
+              <TableEditor 
+                v-if="activeTab === 'info' && (type === 'table' || type === 'table-edit')" 
+                :data="data" 
+                :nodes="nodes"
+                @update="handleUpdate"
+              />
 
-          <!-- NOTE EDITOR -->
-          <NoteEditor 
-            v-if="activeTab === 'info' && type === 'note-edit'" 
-            :data="data" 
-            @update="handleUpdate"
-            @delete="handleDelete"
-          />
+              <NoteEditor 
+                v-if="activeTab === 'info' && type === 'note-edit'" 
+                :data="data" 
+                @update="handleUpdate"
+                @delete="handleDelete"
+              />
 
-          <!-- DATABASE INFO -->
-          <DatabaseEditor 
-            v-if="activeTab === 'database' || (activeTab === 'info' && type === 'database')" 
-            :db-name="activeDatabase || 'No Database Selected'"
-            @delete="handleDelete"
-          />
+              <DatabaseEditor 
+                v-if="activeTab === 'database' || (activeTab === 'info' && type === 'database')" 
+                :db-name="activeDatabase || 'No Active Session'"
+                @delete="handleDelete"
+              />
+           </div>
 
-          <!-- PLACEHOLDER FOR OTHERS -->
-          <div v-if="type === 'none' && activeTab === 'info'" class="h-full flex flex-col items-center justify-center text-gray-300 space-y-4">
-             <Info class="w-12 h-12 opacity-20" />
-             <p class="text-xs font-semibold uppercase tracking-wider">Select an element to inspect</p>
-          </div>
+           <!-- Empty State -->
+           <div v-else class="h-full flex flex-col items-center justify-center text-center opacity-30 select-none">
+              <div class="w-16 h-16 bg-gray-100 rounded-2xl flex-center mb-4">
+                 <Settings class="w-8 h-8 text-gray-400" />
+              </div>
+              <p class="text-[10px] font-black uppercase tracking-widest text-gray-500">Selector Node</p>
+              <p class="text-[11px] font-medium text-gray-400 mt-1 max-w-[150px]">Click a table or note on the canvas to edit properties</p>
+           </div>
         </div>
-      </aside>
-    </transition>
+
+        <!-- Footer / Stats (Optional) -->
+        <footer class="h-10 px-6 border-t border-gray-50 flex items-center justify-between bg-gray-50/50">
+           <span class="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">Properties Inspector</span>
+           <div class="flex items-center gap-3">
+              <div class="w-1.5 h-1.5 rounded-full bg-emerald-500 anim-pulse"></div>
+              <span class="text-[9px] font-bold text-gray-500">Live Sync</span>
+           </div>
+        </footer>
+      </div>
+    </Transition>
   </div>
 </template>
 
 <style scoped>
-.panel-slide-enter-active, .panel-slide-leave-active {
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+.anim-pulse {
+  animation: pulse 2s infinite;
 }
-.panel-slide-enter-from, .panel-slide-leave-to {
-  transform: translateX(100%);
-  opacity: 0;
+@keyframes pulse {
+  0% { opacity: 0.4; }
+  50% { opacity: 1; }
+  100% { opacity: 0.4; }
 }
 </style>

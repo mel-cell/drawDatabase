@@ -1,11 +1,54 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
 
-html,
-body,
-#app {
-  height: 100%;
-  margin: 0;
+:root {
+  --bg-app: #f1f5f9;
+  --bg-sidebar: #f8fafc;
+  --bg-panel: #ffffff;
+  --border-color: #e2e8f0;
+  --primary: #2563eb;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  @apply bg-slate-50 text-slate-900 antialiased overflow-hidden;
+}
+
+/* IDE Layout Helpers */
+.ide-container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  flex-direction: column;
+}
+
+.ide-main {
+  display: flex;
+  flex: 1;
   overflow: hidden;
+}
+
+.ide-content-stack {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Solid Panel UI */
+.panel-border {
+  border: 1px solid var(--border-color);
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  @apply bg-slate-200 rounded-full;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-300;
 }

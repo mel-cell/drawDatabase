@@ -113,7 +113,7 @@ onUnmounted(() => {
 
 <template>
   <div
-    class="fixed bottom-0 left-0 right-0 bg-white shadow-[0_-4px_10px_rgba(0,0,0,0.1)] z-40 flex flex-col transition-none"
+    class="relative w-full bg-white flex flex-col transition-none border-t border-gray-300 shadow-[0_-4px_12px_rgba(0,0,0,0.05)]"
     :style="{ height: drawerHeight + 'px' }"
   >
     <!-- DRAG HANDLE (Always Visible) -->

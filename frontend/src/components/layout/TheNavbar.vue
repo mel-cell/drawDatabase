@@ -13,6 +13,8 @@ import {
   Layers,
   Table as TableIcon,
   Terminal,
+  Activity,
+  ChevronDown
 } from "lucide-vue-next";
 
 defineProps<{
@@ -26,6 +28,7 @@ const { saveAll } = useDiagram();
 const isSaving = ref(false);
 
 const handleSync = async () => {
+  if (isSaving.value) return;
   isSaving.value = true;
   try {
     await saveAll();
@@ -36,129 +39,78 @@ const handleSync = async () => {
 </script>
 
 <template>
-  <header class="bg-white border-b border-gray-200 z-50 relative select-none">
-    <!-- Top System Bar -->
-    <div
-      class="h-10 px-4 bg-gray-900 flex items-center justify-between text-white/50 text-[11px] font-medium"
-    >
-      <div class="flex items-center gap-6">
-        <div class="flex items-center gap-2 text-white">
-          <div
-            class="w-5 h-5 bg-blue-600 rounded-lg flex items-center justify-center font-black text-[10px]"
-          >
-            D
-          </div>
-          <span class="font-bold tracking-tight">DrawDatabase</span>
+  <nav class="h-14 w-full bg-white border-b border-gray-200 flex items-center justify-between px-4 select-none">
+    <!-- BRAND & MAIN MENU -->
+    <div class="flex items-center gap-8">
+      <div class="flex items-center gap-2.5 group cursor-pointer">
+        <div class="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-200 group-hover:scale-105 transition-transform">
+          <DatabaseIcon class="w-4 h-4 text-white" />
         </div>
-        <div class="flex gap-4">
-          <button class="hover:text-white transition-colors">File</button>
-          <button class="hover:text-white transition-colors">Edit</button>
-          <button class="hover:text-white transition-colors">Database</button>
-          <button class="hover:text-white transition-colors">Help</button>
+        <div class="flex flex-col">
+          <span class="text-xs font-black tracking-tight text-gray-900 leading-none">DRAW<span class="text-blue-600">DB</span></span>
+          <span class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Architect</span>
         </div>
       </div>
 
-      <div class="flex items-center gap-4">
-        <div
-          class="flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full text-blue-300 border border-white/5"
-        >
-          <DatabaseIcon class="w-3 h-3" />
-          <span class="font-bold uppercase tracking-widest text-[9px]">{{
-            currentDatabase || "No Database"
-          }}</span>
-        </div>
-        <div class="h-3 w-px bg-white/10"></div>
-        <div class="flex items-center gap-2 hover:text-white cursor-pointer">
-          <User class="w-3.5 h-3.5" />
-          <span>root@localhost</span>
-        </div>
+      <div class="h-6 w-px bg-gray-100"></div>
+
+      <!-- Quick Actions -->
+      <div class="flex items-center gap-1">
+        <button @click="$emit('navigate', 'diagram')" 
+                :class="currentPage === 'diagram' ? 'bg-blue-50 text-blue-600' : 'text-gray-500 hover:bg-gray-50'"
+                class="px-4 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2">
+          <Layers class="w-3.5 h-3.5" />
+          Editor
+        </button>
+        <button @click="$emit('navigate', 'data')"
+                :class="currentPage === 'data' ? 'bg-blue-50 text-blue-600' : 'text-gray-500 hover:bg-gray-50'"
+                class="px-4 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2">
+          <TableIcon class="w-3.5 h-3.5" />
+          Browser
+        </button>
+        <button @click="$emit('navigate', 'sql')"
+                :class="currentPage === 'sql' ? 'bg-blue-50 text-blue-600' : 'text-gray-500 hover:bg-gray-50'"
+                class="px-4 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2">
+          <Terminal class="w-3.5 h-3.5" />
+          SQL
+        </button>
       </div>
     </div>
 
-    <!-- Toolbar / Navigation -->
-    <div class="h-14 px-4 flex items-center justify-between">
-      <!-- Left Actions -->
+    <!-- CENTER STATUS -->
+    <div class="absolute left-1/2 -translate-x-1/2 flex items-center gap-3">
+       <button @click="handleSync" 
+               :disabled="isSaving"
+               class="flex items-center gap-2 px-5 py-2 bg-gray-900 hover:bg-black text-white rounded-xl text-[11px] font-bold transition-all shadow-xl active:scale-95 disabled:opacity-50">
+          <Loader2 v-if="isSaving" class="w-3.5 h-3.5 animate-spin text-blue-400" />
+          <Save v-else class="w-3.5 h-3.5" />
+          {{ isSaving ? 'SAVING...' : 'SYNC TO DATABASE' }}
+       </button>
+    </div>
+
+    <!-- RIGHT TOOLS -->
+    <div class="flex items-center gap-4">
+      <!-- Database Indicators -->
+      <div class="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-100 rounded-xl cursor-default group">
+        <div class="w-1.5 h-1.5 rounded-full" :class="currentDatabase ? 'bg-emerald-500' : 'bg-gray-300'"></div>
+        <span class="text-[10px] font-bold text-gray-600 uppercase tracking-tight">{{ currentDatabase || 'No Connection' }}</span>
+        <ChevronDown class="w-3 h-3 text-gray-400" />
+      </div>
+
+      <div class="h-6 w-px bg-gray-100"></div>
+
       <div class="flex items-center gap-2">
-        <button
-          @click="handleSync"
-          :disabled="isSaving"
-          class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-blue-200 active:scale-95 disabled:opacity-50"
-        >
-          <Loader2 v-if="isSaving" class="w-4 h-4 animate-spin" />
-          <Save v-else class="w-4 h-4" />
-          <span>Sync to DB</span>
+        <button class="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all relative">
+          <Activity class="w-4 h-4" />
+          <span class="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-blue-500 rounded-full border border-white"></span>
         </button>
-
-        <div class="w-px h-6 bg-gray-200 mx-2"></div>
-
-        <button
-          class="p-2 text-gray-500 hover:bg-gray-100 rounded-xl transition-all"
-          title="Export Structure"
-        >
+        <button class="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all">
           <Download class="w-4 h-4" />
         </button>
-        <button
-          class="p-2 text-gray-500 hover:bg-gray-100 rounded-xl transition-all"
-          title="Import Diagram"
-        >
-          <Upload class="w-4 h-4" />
-        </button>
-      </div>
-
-      <!-- Center Navigation (Tabs) -->
-      <div class="flex bg-gray-100 p-1 rounded-2xl border border-gray-100">
-        <button
-          @click="$emit('navigate', 'diagram')"
-          :class="
-            currentPage === 'diagram'
-              ? 'bg-white text-blue-600 shadow-sm'
-              : 'text-gray-500 hover:text-gray-900'
-          "
-          class="flex items-center gap-2 px-6 py-1.5 rounded-xl text-xs font-bold transition-all"
-        >
-          <Layers class="w-3.5 h-3.5" />
-          Diagram
-        </button>
-        <button
-          @click="$emit('navigate', 'data')"
-          :class="
-            currentPage === 'data'
-              ? 'bg-white text-blue-600 shadow-sm'
-              : 'text-gray-500 hover:text-gray-900'
-          "
-          class="flex items-center gap-2 px-6 py-1.5 rounded-xl text-xs font-bold transition-all"
-        >
-          <TableIcon class="w-3.5 h-3.5" />
-          Data Browser
-        </button>
-        <button
-          @click="$emit('navigate', 'sql')"
-          :class="
-            currentPage === 'sql'
-              ? 'bg-white text-blue-600 shadow-sm'
-              : 'text-gray-500 hover:text-gray-900'
-          "
-          class="flex items-center gap-2 px-6 py-1.5 rounded-xl text-xs font-bold transition-all"
-        >
-          <Terminal class="w-3.5 h-3.5" />
-          SQL Console
-        </button>
-      </div>
-
-      <!-- Right Side -->
-      <div class="flex items-center gap-2">
-        <button
-          class="p-2 text-gray-400 hover:text-gray-900 rounded-xl transition-all"
-        >
-          <Settings class="w-4 h-4" />
+        <button class="ml-2 w-8 h-8 rounded-full bg-slate-200 flex-center border-2 border-white shadow-sm cursor-pointer hover:border-blue-100 transition-all">
+           <User class="w-4 h-4 text-slate-500" />
         </button>
       </div>
     </div>
-  </header>
+  </nav>
 </template>
-
-<style scoped>
-header {
-  -webkit-font-smoothing: antialiased;
-}
-</style>
