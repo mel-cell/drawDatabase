@@ -3,12 +3,12 @@ import { ref } from "vue";
 import { VueFlow, useVueFlow } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
 import { useDiagram } from "../../composables/useDiagram";
+import { useToast } from "../../composables/useToast";
 
 // Components
 import TableNode from "../TableNode.vue";
 import NoteNode from "../nodes/NoteNode.vue";
 import FloatingToolbar from "./FloatingToolbar.vue";
-import ContextPanel from "./ContextPanel.vue";
 import ContextMenu from "../ui/ContextMenu.vue";
 
 const props = defineProps<{
@@ -16,6 +16,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits(["node-select"]);
+const toast = useToast();
 
 // --- CORE LOGIC ---
 const { nodes, edges, removeNode, saveAll } = useDiagram();
@@ -27,8 +28,6 @@ const {
 
 // --- STATE ---
 const currentTool = ref("pointer");
-const selectedNode = ref<any>(null);
-const panelTrigger = ref(0);
 const contextMenu = ref({
   visible: false,
   x: 0,
@@ -49,6 +48,7 @@ const addTable = () => {
       columns: [{ name: "id", type: "INT", is_pk: true, is_nn: true }],
     },
   });
+  toast.success("Table Added", "New table created on canvas");
 };
 
 const addNote = () => {
@@ -82,46 +82,22 @@ const addGroup = () => {
   });
 };
 
-const handleToolAction = (action: string) => {
-  switch (action) {
-    case "add-table":
-      addTable();
-      break;
-    case "add-note":
-      addNote();
-      break;
-    case "add-group":
-      addGroup();
-      break;
-    case "sync":
-      saveAll();
-      break;
-    case "reset":
-      if (confirm("Clear canvas?")) {
-        nodes.value = [];
-        edges.value = [];
-      }
-      break;
-    case "pointer":
-    case "hand":
-      currentTool.value = action;
-      break;
-  }
+const handleReset = () => {
+  nodes.value = [];
+  edges.value = [];
+  toast.info("Canvas Cleared", "All items have been removed");
 };
 
 // --- EVENTS ---
-onNodeClick((e) => {
-  selectedNode.value = e.node;
-  panelTrigger.value++;
+onNodeClick((e: any) => {
   emit("node-select", e.node);
 });
 
 onPaneClick(() => {
-  selectedNode.value = null;
   emit("node-select", null);
 });
 
-onNodeContextMenu((e) => {
+onNodeContextMenu((e: any) => {
   e.event.preventDefault();
   const ev = e.event as MouseEvent;
   contextMenu.value = {
@@ -135,7 +111,7 @@ onNodeContextMenu((e) => {
 const handleDeleteNode = () => {
   if (contextMenu.value.targetId) {
     removeNode(contextMenu.value.targetId);
-    selectedNode.value = null;
+    toast.warning("Item Deleted");
   }
   contextMenu.value.visible = false;
 };
@@ -143,64 +119,52 @@ const handleDeleteNode = () => {
 
 <template>
   <div
-    class="h-full w-full bg-[#f8fafc] relative overflow-hidden flex"
+    class="h-full w-full bg-[#f8fafc] relative overflow-hidden"
     @contextmenu.prevent
   >
-    <!-- Canvas Area -->
-    <div class="flex-1 relative">
-      <!-- Floating Toolbar -->
-      <div class="absolute top-6 left-6 z-20">
-        <FloatingToolbar
-          :active-database="activeDatabase"
-          @add-table="addTable"
-          @add-note="addNote"
-          @add-group="addGroup"
-          @sync="saveAll"
-          @reset="handleToolAction('reset')"
-        />
-      </div>
-
-      <VueFlow
-        v-model:nodes="nodes"
-        v-model:edges="edges"
-        :delete-key-code="'Backspace'"
-        :pan-on-drag="currentTool === 'hand'"
-        :selection-on-drag="currentTool === 'pointer'"
-        :nodes-draggable="currentTool === 'pointer'"
-        :nodes-connectable="true"
-        fit-view-on-init
-        class="erd-canvas"
-      >
-        <!-- Node Types Registry -->
-        <template #node-table="nodeProps">
-          <TableNode
-            :id="nodeProps.id"
-            :data="nodeProps.data"
-            :selected="nodeProps.selected"
-          />
-        </template>
-
-        <template #node-note="nodeProps">
-          <NoteNode
-            :id="nodeProps.id"
-            :data="nodeProps.data"
-            :selected="nodeProps.selected"
-          />
-        </template>
-
-        <!-- Plugins -->
-        <Background pattern-color="#e2e8f0" :gap="20" />
-      </VueFlow>
+    <!-- Floating Toolbar -->
+    <div class="absolute top-6 left-6 z-20">
+      <FloatingToolbar
+        :active-database="activeDatabase"
+        @add-table="addTable"
+        @add-note="addNote"
+        @add-group="addGroup"
+        @sync="saveAll"
+        @reset="handleReset"
+      />
     </div>
 
-    <!-- Right Properties Panel -->
-    <ContextPanel
-      :type="selectedNode ? (selectedNode.type + '-edit' as any) : 'none'"
-      :data="selectedNode"
-      :trigger="panelTrigger"
-      :active-database="activeDatabase"
-      class="flex-shrink-0"
-    />
+    <VueFlow
+      v-model:nodes="nodes"
+      v-model:edges="edges"
+      :delete-key-code="'Backspace'"
+      :pan-on-drag="currentTool === 'hand'"
+      :selection-on-drag="currentTool === 'pointer'"
+      :nodes-draggable="currentTool === 'pointer'"
+      :nodes-connectable="true"
+      fit-view-on-init
+      class="erd-canvas"
+    >
+      <!-- Node Types Registry -->
+      <template #node-table="nodeProps">
+        <TableNode
+          :id="nodeProps.id"
+          :data="nodeProps.data"
+          :selected="nodeProps.selected"
+        />
+      </template>
+
+      <template #node-note="nodeProps">
+        <NoteNode
+          :id="nodeProps.id"
+          :data="nodeProps.data"
+          :selected="nodeProps.selected"
+        />
+      </template>
+
+      <!-- Plugins -->
+      <Background pattern-color="#e2e8f0" :gap="20" />
+    </VueFlow>
 
     <!-- Context Menu -->
     <ContextMenu

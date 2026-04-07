@@ -1,4 +1,5 @@
 import { ref } from "vue";
+import { useToast } from "./useToast";
 
 export interface ColumnSchema {
   name: string;
@@ -26,6 +27,7 @@ const databases = ref<string[]>([]);
 const currentDatabase = ref<string>(""); // Default empty
 
 export function useSchema() {
+  const toast = useToast();
   const fetchDatabases = async () => {
     try {
       const res = await fetch("http://localhost:3000/api/databases");
@@ -76,7 +78,7 @@ export function useSchema() {
       return true;
     } catch (error) {
       console.error(error);
-      alert("Failed to create table");
+      toast.error("Failed to create table");
       return false;
     }
   };
@@ -122,7 +124,7 @@ export function useSchema() {
       return true;
     } catch (error) {
       console.error(error);
-      alert("Failed to sync database: " + error);
+      toast.error("Sync Failed", String(error));
       return false;
     }
   };

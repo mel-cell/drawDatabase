@@ -39,4 +39,11 @@ func SetupRoutes(
 	// Layout Persistence
 	api.Get("/layout", layoutH.Get)
 	api.Post("/layout", layoutH.Save)
+
+	// Connection Management
+	connH := _handlers.NewConnectionHandler()
+	api.Get("/connections", connH.List)
+	api.Post("/connections", connH.Save)
+	api.Post("/connections/test", connH.Test)
+	api.Delete("/connections", connH.Delete)
 }

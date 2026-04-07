@@ -3,6 +3,8 @@ import { ref, onMounted, computed } from "vue";
 import ConnectionModal from "../modals/ConnectionModal.vue";
 import ContextMenu from "../ui/ContextMenu.vue";
 import { useSchema } from "../../composables/useSchema";
+import { useConnection } from "../../composables/useConnection";
+import { useToast } from "../../composables/useToast";
 import {
   Database,
   Table as TableIcon,
@@ -15,11 +17,13 @@ import {
   Trash2,
   ChevronRight,
   DatabaseZap,
+  Check,
+  X,
 } from "lucide-vue-next";
 
 const emit = defineEmits(["select-table", "navigate", "select-database"]);
 
-// --- STATE ---
+// --- COMPOSABLES ---
 const {
   databases,
   tables,
@@ -29,10 +33,12 @@ const {
   createDatabase,
   deleteDatabase,
 } = useSchema();
+const { activeConnection, fetchConnections } = useConnection();
+const toast = useToast();
 
+// --- STATE ---
 const isConnectionModalOpen = ref(false);
 const searchQuery = ref("");
-const favorites = ref<Set<string>>(new Set());
 
 // Context Menu
 const contextMenuVisible = ref(false);
@@ -40,31 +46,45 @@ const contextMenuPos = ref({ x: 0, y: 0 });
 const contextMenuItems = ref<any[]>([]);
 const contextTarget = ref<any>(null);
 
+// Create DB inline
+const isCreatingDb = ref(false);
+const newDbName = ref("");
+
 // --- COMPUTED ---
 const filteredDatabases = computed(() => {
   if (!searchQuery.value) return databases.value;
-  return databases.value.filter((db) =>
+  return databases.value.filter((db: string) =>
     db.toLowerCase().includes(searchQuery.value.toLowerCase()),
   );
 });
 
 // --- LIFECYCLE ---
 onMounted(() => {
+  fetchConnections();
   fetchDatabases();
-  const saved = localStorage.getItem("drawdb_favorites");
-  if (saved)
-    try {
-      favorites.value = new Set(JSON.parse(saved));
-    } catch (e) {}
 });
 
 // --- ACTIONS ---
 const handleCreateDb = async () => {
-  const name = prompt("Enter new database name:");
-  if (name) {
-    const success = await createDatabase(name);
-    if (success) alert(`Database '${name}' created!`);
+  if (isCreatingDb.value) {
+    if (newDbName.value.trim()) {
+      const success = await createDatabase(newDbName.value.trim());
+      if (success) {
+        toast.success("Database Created", `'${newDbName.value}' is ready`);
+        newDbName.value = "";
+        isCreatingDb.value = false;
+      } else {
+        toast.error("Failed to create database");
+      }
+    }
+  } else {
+    isCreatingDb.value = true;
   }
+};
+
+const cancelCreateDb = () => {
+  isCreatingDb.value = false;
+  newDbName.value = "";
 };
 
 const handleDatabaseClick = async (dbName: string) => {
@@ -77,11 +97,13 @@ const handleDatabaseClick = async (dbName: string) => {
 const handleContextAction = async (action: string) => {
   const target = contextTarget.value;
   if (action === "drop_db") {
-    if (confirm(`Drop database '${target.data}'? This cannot be undone.`)) {
-      await deleteDatabase(target.data);
+    const success = await deleteDatabase(target.data);
+    if (success) {
+      toast.warning("Database Dropped", `'${target.data}' has been removed`);
     }
   } else if (action === "refresh") {
     await fetchDatabases();
+    toast.info("Refreshed", "Database list updated");
   }
   contextMenuVisible.value = false;
 };
@@ -117,14 +139,10 @@ const openContextMenu = (e: MouseEvent, type: string, data: any) => {
           class="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)] animate-pulse"
         ></div>
         <div class="flex flex-col">
-          <span
-            class="text-[10px] font-bold text-gray-400 uppercase tracking-tighter"
-            >Connection</span
-          >
-          <span
-            class="text-xs font-bold text-gray-700 group-hover:text-blue-600 transition-colors"
-            >Local MySQL</span
-          >
+          <span class="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Connection</span>
+          <span class="text-xs font-bold text-gray-700 group-hover:text-blue-600 transition-colors">
+            {{ activeConnection?.name || 'Local MySQL' }}
+          </span>
         </div>
       </div>
       <button
@@ -134,6 +152,27 @@ const openContextMenu = (e: MouseEvent, type: string, data: any) => {
       >
         <Plus class="w-4 h-4" />
       </button>
+    </div>
+
+    <!-- Create DB Inline -->
+    <div v-if="isCreatingDb" class="px-4 pt-3 pb-2">
+      <div class="flex items-center gap-2">
+        <input
+          v-model="newDbName"
+          type="text"
+          placeholder="database_name"
+          class="flex-1 px-3 py-2 text-xs bg-blue-50 border border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-300 outline-none"
+          @keydown.enter="handleCreateDb"
+          @keydown.escape="cancelCreateDb"
+          autofocus
+        />
+        <button @click="handleCreateDb" class="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg">
+          <Check class="w-4 h-4" />
+        </button>
+        <button @click="cancelCreateDb" class="p-2 text-gray-400 hover:bg-gray-100 rounded-lg">
+          <X class="w-4 h-4" />
+        </button>
+      </div>
     </div>
 
     <!-- Search Box -->
@@ -230,9 +269,7 @@ const openContextMenu = (e: MouseEvent, type: string, data: any) => {
         class="py-12 flex flex-col items-center justify-center opacity-40 grayscale"
       >
         <DatabaseZap class="w-12 h-12 mb-3" />
-        <p
-          class="text-xs font-bold uppercase tracking-widest text-gray-500 text-center"
-        >
+        <p class="text-xs font-bold uppercase tracking-widest text-gray-500 text-center">
           No Databases Found
         </p>
       </div>

@@ -8,14 +8,15 @@ import DataBrowser from "./components/pages/DataBrowser.vue";
 import UserManagement from "./components/pages/admin/UserManagement.vue";
 import DataDrawer from "./components/layout/DataDrawer.vue";
 import ContextPanel from "./components/layout/ContextPanel.vue";
+import ToastContainer from "./components/ui/ToastContainer.vue";
 import { useSchema } from "./composables/useSchema";
 
 const { currentDatabase } = useSchema();
 const isDataDrawerOpen = ref(false);
 const selectedTableForData = ref("");
-const selectedNodeData = ref<any>(null); // For Right Sidebar Property Editor
+const selectedNodeData = ref<any>(null);
 const selectedDatabase = ref<string>("");
-const selectionTimestamp = ref(0); // Trigger to force reopen panel
+const selectionTimestamp = ref(0);
 const activePage = ref("diagram");
 
 const handleTableSelect = (tableName: string) => {
@@ -24,37 +25,43 @@ const handleTableSelect = (tableName: string) => {
   selectedNodeData.value = null;
 
   if (activePage.value === "diagram") {
-    // In Diagram mode, open bottom drawer
     isDataDrawerOpen.value = true;
   } else {
-    // In other modes, switch to Data Browser Page to view full
     activePage.value = "data";
   }
 };
 
 const handleDatabaseSelect = (dbName: string) => {
   selectedDatabase.value = dbName;
-  currentDatabase.value = dbName; // Sync global state
+  currentDatabase.value = dbName;
   selectedTableForData.value = "";
   selectedNodeData.value = null;
   selectionTimestamp.value = Date.now();
 };
 
 const handleNodeSelect = (node: any) => {
-  // Canvas Node Click -> Open Context Panel (Right)
   if (!node) {
     selectedNodeData.value = null;
     return;
   }
   selectedNodeData.value = node;
-  // Don't clear selectedDatabase if it's just a node click,
-  // but usually nodes belong to the DB.
-  // For now, let's keep selectedDatabase active so context panel knows context.
-  selectionTimestamp.value = Date.now(); // Force update trigger
+  selectionTimestamp.value = Date.now();
 };
 
 const handleNavigation = (page: string) => {
   activePage.value = page;
+};
+
+// Compute context panel type
+const panelType = (): string => {
+  if (selectedNodeData.value) {
+    const t = selectedNodeData.value.type;
+    if (t === "note") return "note-edit";
+    if (t === "group") return "group-edit";
+    return "table-edit";
+  }
+  if (selectedDatabase.value) return "database";
+  return "none";
 };
 </script>
 
@@ -63,7 +70,7 @@ const handleNavigation = (page: string) => {
     <TheNavbar :current-page="activePage" @navigate="handleNavigation" />
 
     <div class="flex-1 flex overflow-hidden">
-      <!-- Sidebar always visible for object explorer -->
+      <!-- Sidebar -->
       <TheSidebar
         @select-table="handleTableSelect"
         @select-database="handleDatabaseSelect"
@@ -73,9 +80,12 @@ const handleNavigation = (page: string) => {
       <!-- PAGE: DIAGRAM -->
       <main
         v-if="activePage === 'diagram'"
-        class="flex-1 relative flex flex-col overflow-hidden animate-in fade-in duration-300"
+        class="flex-1 relative flex flex-col overflow-hidden"
       >
-        <ERDCanvas @node-select="handleNodeSelect" />
+        <ERDCanvas
+          :active-database="currentDatabase"
+          @node-select="handleNodeSelect"
+        />
         <DataDrawer
           :is-open="isDataDrawerOpen"
           :table-name="selectedTableForData"
@@ -86,7 +96,7 @@ const handleNavigation = (page: string) => {
       <!-- PAGE: SQL EDITOR -->
       <main
         v-else-if="activePage === 'sql'"
-        class="flex-1 relative flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300"
+        class="flex-1 relative flex flex-col overflow-hidden"
       >
         <SQLEditor />
       </main>
@@ -94,7 +104,7 @@ const handleNavigation = (page: string) => {
       <!-- PAGE: BROWSE DATA -->
       <main
         v-else-if="activePage === 'data'"
-        class="flex-1 relative flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300"
+        class="flex-1 relative flex flex-col overflow-hidden"
       >
         <DataBrowser :table-name="selectedTableForData" />
       </main>
@@ -102,25 +112,23 @@ const handleNavigation = (page: string) => {
       <!-- PAGE: ADMIN - USERS -->
       <main
         v-else-if="activePage === 'admin-users'"
-        class="flex-1 relative flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300"
+        class="flex-1 relative flex flex-col overflow-hidden"
       >
         <UserManagement />
       </main>
 
-      <!-- PAGE: ADMIN - STATUS (Placeholder) -->
+      <!-- PAGE: ADMIN - STATUS -->
       <main
         v-else-if="activePage === 'admin-status'"
         class="flex-1 flex items-center justify-center bg-gray-50 text-gray-400"
       >
         <div class="text-center">
           <p class="text-lg font-semibold">Server Status Dashboard</p>
-          <p class="text-sm">
-            Realtime process list & monitoring (Coming Soon)
-          </p>
+          <p class="text-sm">Realtime monitoring (Coming Soon)</p>
         </div>
       </main>
 
-      <!-- PAGE: ADMIN - VARIABLES (Placeholder) -->
+      <!-- PAGE: ADMIN - VARIABLES -->
       <main
         v-else-if="activePage === 'admin-variables'"
         class="flex-1 flex items-center justify-center bg-gray-50 text-gray-400"
@@ -131,25 +139,18 @@ const handleNavigation = (page: string) => {
         </div>
       </main>
 
-      <!-- Right Sidebar (Only visible in Diagram mode) -->
+      <!-- Right Sidebar (Diagram mode only) -->
       <ContextPanel
         v-if="activePage === 'diagram'"
         class="shrink-0"
         :trigger="selectionTimestamp"
         :active-database="selectedDatabase"
-        :type="
-          selectedNodeData
-            ? selectedNodeData.type === 'custom-note'
-              ? 'note-edit'
-              : selectedNodeData.type === 'custom-group'
-              ? 'group-edit'
-              : 'table-edit'
-            : selectedDatabase
-            ? 'database'
-            : 'none'
-        "
+        :type="panelType() as any"
         :data="selectedNodeData"
       />
     </div>
+
+    <!-- Toast Notifications -->
+    <ToastContainer />
   </div>
 </template>

@@ -1,6 +1,7 @@
 import { ref } from "vue";
 import { useVueFlow, type Connection } from "@vue-flow/core";
 import { useSchema } from "./useSchema";
+import { useToast } from "./useToast";
 
 // GLOBAL STATE (Singleton)
 const nodes = ref<any[]>([]);
@@ -9,6 +10,7 @@ const edges = ref<any[]>([]);
 export function useDiagram() {
   const { onConnect } = useVueFlow();
   const { tables, relations, syncBatch } = useSchema();
+  const toast = useToast();
 
   // Helper to remove node globally
   const removeNode = (id: string) => {
@@ -126,7 +128,7 @@ export function useDiagram() {
           body: JSON.stringify(positions)
       });
       
-      alert("Changes synced to database successfully!");
+      toast.success("Sync Complete", "Changes synced to database successfully!");
     }
   };
 
