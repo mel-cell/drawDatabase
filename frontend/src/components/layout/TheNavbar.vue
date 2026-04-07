@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import { useSchema } from "../../composables/useSchema";
 import { useDiagram } from "../../composables/useDiagram";
+import { useConnection } from "../../composables/useConnection";
 import {
   Save,
   Settings,
@@ -13,8 +14,8 @@ import {
   Layers,
   Table as TableIcon,
   Terminal,
-  Activity,
-  ChevronDown
+  Wifi,
+  WifiOff,
 } from "lucide-vue-next";
 
 defineProps<{
@@ -25,6 +26,7 @@ const emit = defineEmits(["navigate"]);
 
 const { currentDatabase } = useSchema();
 const { saveAll } = useDiagram();
+const { activeConnection } = useConnection();
 const isSaving = ref(false);
 
 const handleSync = async () => {
@@ -36,80 +38,89 @@ const handleSync = async () => {
     isSaving.value = false;
   }
 };
+
+const isConnected = ref(true); // Will be dynamic later
 </script>
 
 <template>
-  <nav class="h-14 w-full bg-white border-b border-gray-200 flex items-center justify-between px-4 select-none">
-    <!-- BRAND & MAIN MENU -->
-    <div class="flex items-center gap-8">
-      <div class="flex items-center gap-2.5 group cursor-pointer">
-        <div class="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-200 group-hover:scale-105 transition-transform">
-          <DatabaseIcon class="w-4 h-4 text-white" />
+  <nav class="h-14 w-full bg-white flex items-center justify-between px-4 select-none">
+    <!-- LEFT: Brand + Tabs -->
+    <div class="flex items-center gap-6">
+      <!-- Brand -->
+      <div class="flex items-center gap-2.5 cursor-default">
+        <div class="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center shadow-sm">
+          <DatabaseIcon class="w-3.5 h-3.5 text-white" />
         </div>
-        <div class="flex flex-col">
-          <span class="text-xs font-black tracking-tight text-gray-900 leading-none">DRAW<span class="text-blue-600">DB</span></span>
-          <span class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Architect</span>
-        </div>
+        <span class="text-sm font-black tracking-tight text-gray-900">Draw<span class="text-blue-600">DB</span></span>
       </div>
 
-      <div class="h-6 w-px bg-gray-100"></div>
+      <div class="h-5 w-px bg-gray-200"></div>
 
-      <!-- Quick Actions -->
-      <div class="flex items-center gap-1">
-        <button @click="$emit('navigate', 'diagram')" 
-                :class="currentPage === 'diagram' ? 'bg-blue-50 text-blue-600' : 'text-gray-500 hover:bg-gray-50'"
-                class="px-4 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2">
+      <!-- Tabs -->
+      <div class="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
+        <button @click="$emit('navigate', 'diagram')"
+                :class="currentPage === 'diagram' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
+                class="px-4 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5">
           <Layers class="w-3.5 h-3.5" />
-          Editor
+          Diagram
         </button>
         <button @click="$emit('navigate', 'data')"
-                :class="currentPage === 'data' ? 'bg-blue-50 text-blue-600' : 'text-gray-500 hover:bg-gray-50'"
-                class="px-4 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2">
+                :class="currentPage === 'data' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
+                class="px-4 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5">
           <TableIcon class="w-3.5 h-3.5" />
           Browser
         </button>
         <button @click="$emit('navigate', 'sql')"
-                :class="currentPage === 'sql' ? 'bg-blue-50 text-blue-600' : 'text-gray-500 hover:bg-gray-50'"
-                class="px-4 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2">
+                :class="currentPage === 'sql' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
+                class="px-4 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5">
           <Terminal class="w-3.5 h-3.5" />
-          SQL
+          SQL Console
         </button>
       </div>
     </div>
 
-    <!-- CENTER STATUS -->
-    <div class="absolute left-1/2 -translate-x-1/2 flex items-center gap-3">
-       <button @click="handleSync" 
-               :disabled="isSaving"
-               class="flex items-center gap-2 px-5 py-2 bg-gray-900 hover:bg-black text-white rounded-xl text-[11px] font-bold transition-all shadow-xl active:scale-95 disabled:opacity-50">
-          <Loader2 v-if="isSaving" class="w-3.5 h-3.5 animate-spin text-blue-400" />
-          <Save v-else class="w-3.5 h-3.5" />
-          {{ isSaving ? 'SAVING...' : 'SYNC TO DATABASE' }}
-       </button>
+    <!-- CENTER: Sync Button -->
+    <div class="absolute left-1/2 -translate-x-1/2">
+      <button @click="handleSync"
+              :disabled="isSaving"
+              class="flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all shadow-md active:scale-95 disabled:opacity-50">
+        <Loader2 v-if="isSaving" class="w-3.5 h-3.5 animate-spin" />
+        <Save v-else class="w-3.5 h-3.5" />
+        {{ isSaving ? 'Syncing...' : 'Sync to DB' }}
+      </button>
     </div>
 
-    <!-- RIGHT TOOLS -->
-    <div class="flex items-center gap-4">
-      <!-- Database Indicators -->
-      <div class="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-100 rounded-xl cursor-default group">
-        <div class="w-1.5 h-1.5 rounded-full" :class="currentDatabase ? 'bg-emerald-500' : 'bg-gray-300'"></div>
-        <span class="text-[10px] font-bold text-gray-600 uppercase tracking-tight">{{ currentDatabase || 'No Connection' }}</span>
-        <ChevronDown class="w-3 h-3 text-gray-400" />
+    <!-- RIGHT: Status + Tools -->
+    <div class="flex items-center gap-3">
+      <!-- Connection Status -->
+      <div class="flex items-center gap-2 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs">
+        <div class="flex items-center gap-1.5">
+          <Wifi v-if="isConnected" class="w-3 h-3 text-emerald-500" />
+          <WifiOff v-else class="w-3 h-3 text-red-400" />
+          <span class="font-semibold text-gray-700">{{ activeConnection?.name || 'Local MySQL' }}</span>
+        </div>
+        <span class="text-gray-300">|</span>
+        <span class="font-mono text-gray-500">{{ currentDatabase || '—' }}</span>
       </div>
 
-      <div class="h-6 w-px bg-gray-100"></div>
+      <div class="h-5 w-px bg-gray-200"></div>
 
-      <div class="flex items-center gap-2">
-        <button class="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all relative">
-          <Activity class="w-4 h-4" />
-          <span class="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-blue-500 rounded-full border border-white"></span>
-        </button>
-        <button class="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all">
-          <Download class="w-4 h-4" />
-        </button>
-        <button class="ml-2 w-8 h-8 rounded-full bg-slate-200 flex-center border-2 border-white shadow-sm cursor-pointer hover:border-blue-100 transition-all">
-           <User class="w-4 h-4 text-slate-500" />
-        </button>
+      <!-- Action buttons -->
+      <button class="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-all" title="Export">
+        <Download class="w-4 h-4" />
+      </button>
+      <button class="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-all" title="Import">
+        <Upload class="w-4 h-4" />
+      </button>
+      <button class="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-all" title="Settings">
+        <Settings class="w-4 h-4" />
+      </button>
+
+      <div class="h-5 w-px bg-gray-200"></div>
+
+      <!-- User avatar -->
+      <div class="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-blue-200 transition-all">
+        <User class="w-3.5 h-3.5 text-gray-500" />
       </div>
     </div>
   </nav>

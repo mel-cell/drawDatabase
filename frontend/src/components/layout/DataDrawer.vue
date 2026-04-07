@@ -9,7 +9,7 @@ const props = defineProps<{
 
 const emit = defineEmits(["close"]);
 
-const drawerHeight = ref(24); // Default Height (Collapsed)
+const drawerHeight = ref(300); // Default Height (Show Statistics)
 const isDragging = ref(false);
 const activeTab = ref("stats"); // Default to Statistics
 

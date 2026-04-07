@@ -113,9 +113,9 @@ const showRightPanel = computed(() => activePage.value === 'diagram' && (selecte
             </Transition>
         </div>
 
-        <!-- BOTTOM PANEL (Data Drawer) - SELEVEL DENGAN SIDEBAR DALAM MAIN COLUMN -->
+        <!-- BOTTOM PANEL (Data Drawer) - Always visible in diagram mode -->
         <DataDrawer
-            v-if="activePage === 'diagram' && isDataDrawerOpen"
+            v-if="activePage === 'diagram'"
             :is-open="isDataDrawerOpen"
             :table-name="selectedTableForData"
             @close="isDataDrawerOpen = false"
