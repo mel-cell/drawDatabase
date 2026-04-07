@@ -12,9 +12,9 @@ export function useDiagram() {
 
   // Helper to remove node globally
   const removeNode = (id: string) => {
-    nodes.value = nodes.value.filter(n => n.id !== id);
+    nodes.value = nodes.value.filter((n: any) => n.id !== id);
     // Also remove connected edges
-    edges.value = edges.value.filter(e => e.source !== id && e.target !== id);
+    edges.value = edges.value.filter((e: any) => e.source !== id && e.target !== id);
   };
 
   const syncDiagram = async (forceReset = false) => {
