@@ -1,10 +1,10 @@
 import { ref } from "vue";
-import { useVueFlow, type Connection, type Edge, type Node } from "@vue-flow/core";
+import { useVueFlow, type Connection } from "@vue-flow/core";
 import { useSchema } from "./useSchema";
 
 // GLOBAL STATE (Singleton)
-const nodes = ref<Node[]>([]);
-const edges = ref<Edge[]>([]);
+const nodes = ref<any[]>([]);
+const edges = ref<any[]>([]);
 
 export function useDiagram() {
   const { onConnect } = useVueFlow();
@@ -81,7 +81,7 @@ export function useDiagram() {
         style: { stroke: "#3b82f6", strokeWidth: 2 },
         type: "smoothstep",
     };
-    edges.value.push(newEdge as Edge);
+    edges.value.push(newEdge as any);
   });
 
   const saveAll = async () => {
