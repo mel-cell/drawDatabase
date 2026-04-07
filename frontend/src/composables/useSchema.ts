@@ -81,6 +81,52 @@ export function useSchema() {
     }
   };
 
+  const createDatabase = async (name: string) => {
+    try {
+      const res = await fetch("http://localhost:3000/api/databases", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (res.ok) {
+        await fetchDatabases();
+        return true;
+      }
+      return false;
+    } catch (e) { console.error(e); return false; }
+  };
+
+  const deleteDatabase = async (name: string) => {
+    try {
+      const res = await fetch(`http://localhost:3000/api/databases?name=${name}`, { method: "DELETE" });
+      if (res.ok) {
+        await fetchDatabases();
+        if (currentDatabase.value === name) currentDatabase.value = "";
+        return true;
+      }
+      return false;
+    } catch (e) { console.error(e); return false; }
+  };
+
+  const syncBatch = async (batchData: any[]) => {
+    try {
+      const res = await fetch(`http://localhost:3000/api/tables/sync?db=${currentDatabase.value}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(batchData),
+      });
+
+      if (!res.ok) throw new Error("Failed to sync database");
+
+      await fetchSchema();
+      return true;
+    } catch (error) {
+      console.error(error);
+      alert("Failed to sync database: " + error);
+      return false;
+    }
+  };
+
   return {
     tables,
     relations,
@@ -90,5 +136,8 @@ export function useSchema() {
     fetchDatabases,
     switchDatabase,
     createTable,
+    syncBatch,
+    createDatabase,
+    deleteDatabase,
   };
 }

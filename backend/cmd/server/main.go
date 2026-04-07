@@ -2,8 +2,13 @@ package main
 
 import (
 	"backend/internal/config"
-	"backend/internal/database"
-	"backend/internal/routes"
+	infraDB "backend/internal/database"
+    "backend/internal/repository/mysql"
+    "backend/internal/app/schema"
+    appDB "backend/internal/app/database"
+    "backend/internal/app/data"
+    "backend/internal/app/layout"
+	"backend/internal/transport/http/routes"
 	"log"
 
 	"github.com/gofiber/fiber/v2"
@@ -14,19 +19,27 @@ func main() {
 	// 1. Load Configuration
 	cfg := config.LoadConfig()
 
-	// 2. Connect to Database
-	database.Connect(cfg.DSN)
+	// 2. Connect to Database (Global GORM instance for now)
+	infraDB.Connect(cfg.DSN)
+    
+    // 3. Dependency Injection (Modern Style)
+    repo := mysql.NewMySQLRepository(infraDB.DB)
+    
+    syncSvc := schema.NewSyncService(repo)
+    dbSvc := appDB.NewDatabaseService(repo)
+    dataSvc := data.NewDataService(repo)
+    layoutSvc := layout.NewLayoutService(repo)
 
-	// 3. Initialize Fiber App
+	// 4. Initialize Fiber App
 	app := fiber.New()
 
-	// 4. Middleware
+	// 5. Middleware
 	app.Use(cors.New())
 
-	// 5. Setup Routes
-	routes.SetupRoutes(app)
+	// 6. Setup Routes (Connect Services to Handlers)
+	routes.SetupRoutes(app, syncSvc, dbSvc, dataSvc, layoutSvc)
 
-	// 6. Start Server
-	log.Printf("Server listening on port %s", cfg.ServerPort)
+	// 7. Start Server
+	log.Printf("Server listening on port %s (Clean Architecture)", cfg.ServerPort)
 	log.Fatal(app.Listen(cfg.ServerPort))
 }

@@ -1,68 +1,71 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
-import TreeNode from "../common/tree/TreeNode.vue";
+import { ref, onMounted, computed } from "vue";
 import ConnectionModal from "../modals/ConnectionModal.vue";
 import ContextMenu from "../ui/ContextMenu.vue";
 import { useSchema } from "../../composables/useSchema";
 import {
   Database,
-  Folder,
-  Table,
+  Table as TableIcon,
   Search,
   Activity,
   User,
   Settings,
   Plus,
-  MoreVertical,
   RefreshCw,
   Trash2,
-  Eye,
-  Edit,
-  AlertTriangle,
+  ChevronRight,
+  DatabaseZap,
 } from "lucide-vue-next";
 
 const emit = defineEmits(["select-table", "navigate", "select-database"]);
 
-// State
-const isConnectionModalOpen = ref(false);
-const activeFilter = ref("all");
-const favorites = ref<Set<string>>(new Set());
+// --- STATE ---
 const {
   databases,
   tables,
   currentDatabase,
   fetchDatabases,
   switchDatabase,
-  fetchSchema,
+  createDatabase,
+  deleteDatabase,
 } = useSchema();
 
-// Context Menu State
+const isConnectionModalOpen = ref(false);
+const searchQuery = ref("");
+const favorites = ref<Set<string>>(new Set());
+
+// Context Menu
 const contextMenuVisible = ref(false);
 const contextMenuPos = ref({ x: 0, y: 0 });
 const contextMenuItems = ref<any[]>([]);
 const contextTarget = ref<any>(null);
 
-// Load Favorites
+// --- COMPUTED ---
+const filteredDatabases = computed(() => {
+  if (!searchQuery.value) return databases.value;
+  return databases.value.filter((db) =>
+    db.toLowerCase().includes(searchQuery.value.toLowerCase()),
+  );
+});
+
+// --- LIFECYCLE ---
 onMounted(() => {
   fetchDatabases();
   const saved = localStorage.getItem("drawdb_favorites");
-  if (saved) {
+  if (saved)
     try {
       favorites.value = new Set(JSON.parse(saved));
     } catch (e) {}
-  }
 });
 
-const toggleFavorite = (dbName: string) => {
-  if (favorites.value.has(dbName)) favorites.value.delete(dbName);
-  else favorites.value.add(dbName);
-  localStorage.setItem(
-    "drawdb_favorites",
-    JSON.stringify([...favorites.value])
-  );
+// --- ACTIONS ---
+const handleCreateDb = async () => {
+  const name = prompt("Enter new database name:");
+  if (name) {
+    const success = await createDatabase(name);
+    if (success) alert(`Database '${name}' created!`);
+  }
 };
-
-// ... (Left Click Logic)
 
 const handleDatabaseClick = async (dbName: string) => {
   if (currentDatabase.value !== dbName) {
@@ -71,346 +74,202 @@ const handleDatabaseClick = async (dbName: string) => {
   emit("select-database", dbName);
 };
 
-const handleTableClick = (tableName: string) => {
-  emit("select-table", tableName);
+const handleContextAction = async (action: string) => {
+  const target = contextTarget.value;
+  if (action === "drop_db") {
+    if (confirm(`Drop database '${target.data}'? This cannot be undone.`)) {
+      await deleteDatabase(target.data);
+    }
+  } else if (action === "refresh") {
+    await fetchDatabases();
+  }
+  contextMenuVisible.value = false;
 };
 
-// ... (Right Click Logic)
-
-const handleContextMenu = (
-  e: MouseEvent,
-  type: "database" | "table" | "folder-table",
-  data: any
-) => {
+const openContextMenu = (e: MouseEvent, type: string, data: any) => {
   contextTarget.value = { type, data };
   contextMenuPos.value = { x: e.clientX, y: e.clientY };
 
   if (type === "database") {
-    const isCurrent = currentDatabase.value === data;
-    const isFav = favorites.value.has(data);
-
     contextMenuItems.value = [
-      {
-        label: "Set as Active",
-        action: "use_db",
-        icon: Database,
-        disabled: isCurrent,
-      },
-      {
-        label: isFav ? "Remove from Favorites" : "Add to Favorites",
-        action: "toggle_fav",
-        icon: isFav ? Trash2 : Folder, // Or Star icon if imported
-      },
-      { type: "divider" },
-      {
-        label: "New Table...",
-        action: "create_table",
-        icon: Plus,
-        disabled: !isCurrent,
-      },
-      { label: "Rename Database", action: "rename_db", icon: Edit },
-      { label: "Refresh", action: "refresh_db", icon: RefreshCw },
+      { label: "Refresh Data", action: "refresh", icon: RefreshCw },
       { type: "divider" },
       { label: "Drop Database", action: "drop_db", danger: true, icon: Trash2 },
     ];
-  } else if (type === "table") {
-    contextMenuItems.value = [
-      { label: "Browse Data", action: "view_data", icon: Eye },
-      { label: "Design Structure", action: "design_table", icon: Edit },
-      {
-        label: "Truncate Table",
-        action: "truncate_table",
-        icon: AlertTriangle,
-      },
-      { label: "Drop Table", action: "drop_table", danger: true, icon: Trash2 },
-    ];
-  } else if (type === "folder-table") {
-    contextMenuItems.value = [
-      { label: "Create New Table", action: "create_table", icon: Plus },
-      { label: "Refresh Tables", action: "refresh_db", icon: RefreshCw },
-    ];
   }
-
   contextMenuVisible.value = true;
-};
-
-const handleContextSelect = async (action: string) => {
-  const target = contextTarget.value;
-
-  if (action === "toggle_fav") {
-    toggleFavorite(target.data);
-  }
-  // Common Actions
-  else if (action === "create_table") {
-    alert(
-      "To create a table, please click the 'New Table' tool in the floating toolbar on the diagram."
-    );
-  }
-  // Database Actions
-  else if (action === "use_db") {
-    await switchDatabase(target.data);
-  } else if (action === "refresh_db") {
-    await fetchSchema();
-  } else if (action === "rename_db") {
-    const newName = prompt("Enter new database name:", target.data);
-    if (newName && newName !== target.data) {
-      try {
-        const res = await fetch("http://localhost:3000/api/databases/rename", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ old_name: target.data, new_name: newName }),
-        });
-        if (res.ok) {
-          // Update favorites if renamed
-          if (favorites.value.has(target.data)) {
-            favorites.value.delete(target.data);
-            favorites.value.add(newName);
-            localStorage.setItem(
-              "drawdb_favorites",
-              JSON.stringify([...favorites.value])
-            );
-          }
-          alert("Database renamed!");
-          location.reload();
-        } else {
-          const err = await res.json();
-          alert("Error: " + err.error);
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    }
-  } else if (action === "drop_db") {
-    if (
-      confirm(
-        `⚠️ WARNING: Drop database '${target.data}'?\nAll tables and data will be lost permanently!`
-      )
-    ) {
-      await fetch(`http://localhost:3000/api/databases?name=${target.data}`, {
-        method: "DELETE",
-      });
-      // Remove from favs
-      if (favorites.value.has(target.data)) {
-        favorites.value.delete(target.data);
-        localStorage.setItem(
-          "drawdb_favorites",
-          JSON.stringify([...favorites.value])
-        );
-      }
-      alert("Database dropped");
-      location.reload();
-    }
-  }
-  // ... rest of actions
-  else if (action === "view_data") {
-    emit("select-table", target.data); // Navigate to browse
-    emit("navigate", "data");
-  } else if (action === "drop_table") {
-    if (confirm(`Drop table '${target.data}'?`)) {
-      await fetch(`http://localhost:3000/api/tables?name=${target.data}`, {
-        method: "DELETE",
-      });
-      await fetchSchema();
-    }
-  } else if (action === "truncate_table") {
-    if (confirm(`Truncate table '${target.data}'? All rows will be deleted.`)) {
-      await fetch("http://localhost:3000/api/execute", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: `TRUNCATE TABLE \`${target.data}\`` }),
-      });
-      alert("Table truncated.");
-    }
-  }
-
-  contextMenuVisible.value = false;
 };
 </script>
 
 <template>
   <aside
-    class="w-64 bg-gray-50 border-r border-gray-200 flex flex-col h-full select-none z-10 relative"
+    class="w-72 bg-white border-r border-gray-200 flex flex-col h-full select-none z-10 relative shadow-sm"
   >
-    <!-- Header: Connection Manager -->
+    <!-- Connection Header -->
     <div
-      class="h-12 flex items-center justify-between px-4 border-b border-gray-200 bg-white"
+      class="h-14 flex items-center justify-between px-5 bg-gray-50/50 border-b border-gray-200"
     >
       <div
-        class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
         @click="isConnectionModalOpen = true"
+        class="flex items-center gap-3 cursor-pointer group"
       >
         <div
-          class="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.6)]"
+          class="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)] animate-pulse"
         ></div>
-        <span class="text-xs font-bold text-gray-700">localhost:3306</span>
+        <div class="flex flex-col">
+          <span
+            class="text-[10px] font-bold text-gray-400 uppercase tracking-tighter"
+            >Connection</span
+          >
+          <span
+            class="text-xs font-bold text-gray-700 group-hover:text-blue-600 transition-colors"
+            >Local MySQL</span
+          >
+        </div>
       </div>
       <button
-        class="p-1 text-gray-400 hover:text-gray-600 rounded hover:bg-gray-100"
+        @click="handleCreateDb"
+        class="p-2 text-blue-600 hover:bg-blue-100 rounded-xl transition-all"
+        title="New Database"
       >
-        <MoreVertical class="w-4 h-4" />
+        <Plus class="w-4 h-4" />
       </button>
     </div>
 
-    <!-- Search / Filter -->
-    <div class="px-3 py-2 border-b border-gray-200 bg-gray-50/50">
-      <div class="relative">
+    <!-- Search Box -->
+    <div class="p-4">
+      <div class="relative group">
         <Search
-          class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400"
+          class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-blue-500 transition-colors"
         />
         <input
+          v-model="searchQuery"
           type="text"
-          placeholder="Search objects..."
-          class="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded text-gray-600 focus:border-blue-400 focus:ring-1 focus:ring-blue-100 outline-none transition-all"
+          placeholder="Filter databases..."
+          class="w-full pl-10 pr-4 py-2.5 text-xs bg-gray-50 border border-transparent rounded-xl focus:bg-white focus:border-blue-400 focus:ring-4 focus:ring-blue-50 outline-none transition-all"
         />
       </div>
-      <div class="flex gap-2 mt-2 px-1">
-        <button
-          @click="activeFilter = 'all'"
-          class="text-[10px] px-2 py-0.5 rounded border transition-colors"
-          :class="
-            activeFilter === 'all'
-              ? 'bg-blue-50 border-blue-100 text-blue-600 font-bold'
-              : 'bg-transparent border-transparent text-gray-500 hover:text-gray-700'
-          "
-        >
-          All
-        </button>
-        <button
-          @click="activeFilter = 'fav'"
-          class="text-[10px] px-2 py-0.5 rounded border transition-colors"
-          :class="
-            activeFilter === 'fav'
-              ? 'bg-blue-50 border-blue-100 text-blue-600 font-bold'
-              : 'bg-transparent border-transparent text-gray-500 hover:text-gray-700'
-          "
-        >
-          Favorites
-        </button>
-      </div>
     </div>
 
-    <!-- Object Explorer Tree -->
-    <div class="flex-1 overflow-y-auto py-2">
-      <!-- Database List -->
-      <div v-for="db in databases" :key="db">
-        <TreeNode
-          v-if="activeFilter === 'all' || favorites.has(db)"
-          :label="db"
-          :has-children="true"
-          :is-open="db === currentDatabase"
-          @contextmenu="(e: MouseEvent) => handleContextMenu(e, 'database', db)"
+    <!-- DB Explorer -->
+    <div class="flex-1 overflow-y-auto px-2 space-y-1 scrollbar-thin">
+      <div v-for="db in filteredDatabases" :key="db" class="group/db">
+        <div
           @click="handleDatabaseClick(db)"
+          @contextmenu.prevent="openContextMenu($event, 'database', db)"
+          class="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all border border-transparent"
+          :class="
+            db === currentDatabase
+              ? 'bg-blue-50 border-blue-100'
+              : 'hover:bg-gray-50'
+          "
         >
-          <template #icon>
-            <div class="relative">
-              <Database
-                class="w-3.5 h-3.5 text-yellow-600"
-                :class="{ 'fill-yellow-100': db === currentDatabase }"
-              />
-              <!-- Fav Star -->
-              <div
-                v-if="favorites.has(db)"
-                class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-white flex items-center justify-center"
-              >
-                <div class="w-1.5 h-1.5 bg-yellow-400 rounded-full"></div>
-              </div>
-            </div>
-          </template>
+          <div
+            class="p-1.5 rounded-lg"
+            :class="
+              db === currentDatabase
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'bg-gray-100 text-gray-400 group-hover/db:bg-gray-200'
+            "
+          >
+            <Database class="w-4 h-4" />
+          </div>
+          <div class="flex-1 flex flex-col min-w-0">
+            <span
+              class="text-xs font-bold truncate"
+              :class="
+                db === currentDatabase ? 'text-blue-700' : 'text-gray-700'
+              "
+              >{{ db }}</span
+            >
+            <span
+              v-if="db === currentDatabase"
+              class="text-[9px] text-blue-400 font-bold uppercase tracking-widest"
+              >Active</span
+            >
+          </div>
+          <ChevronRight
+            class="w-3.5 h-3.5 text-gray-300 transition-transform"
+            :class="{ 'rotate-90 text-blue-400': db === currentDatabase }"
+          />
+        </div>
 
-          <!-- Tables inside active DB -->
+        <!-- Tables List (Active DB Only) -->
+        <transition name="slide-down">
           <div
             v-if="db === currentDatabase"
-            class="ml-1 border-l border-gray-200/50"
+            class="ml-9 mt-1 mb-2 space-y-0.5 border-l-2 border-blue-100 pl-3"
           >
-            <!-- Folder: Tables -->
-            <TreeNode
-              label="Tables"
-              :has-children="true"
-              :is-open="true"
-              @contextmenu.stop="(e: MouseEvent) => handleContextMenu(e, 'folder-table', null)"
+            <div
+              v-for="tbl in tables"
+              :key="tbl.name"
+              @click.stop="$emit('select-table', tbl.name)"
+              class="flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-gray-50 text-[11px] text-gray-600 cursor-pointer group/tbl"
             >
-              <template #icon
-                ><Folder class="w-3.5 h-3.5 text-blue-400 fill-blue-50"
-              /></template>
-
-              <TreeNode
-                v-for="tbl in tables"
-                :key="tbl.name"
-                :label="tbl.name"
-                @click.stop="handleTableClick(tbl.name)"
-                @contextmenu.stop="(e: MouseEvent) => handleContextMenu(e, 'table', tbl.name)"
+              <TableIcon
+                class="w-3.5 h-3.5 text-gray-400 group-hover/tbl:text-blue-500"
+              />
+              <span
+                class="truncate group-hover/tbl:text-blue-700 transition-colors"
+                >{{ tbl.name }}</span
               >
-                <template #icon
-                  ><Table class="w-3.5 h-3.5 text-blue-500"
-                /></template>
-              </TreeNode>
-
-              <div
-                v-if="tables.length === 0"
-                class="pl-9 py-1 text-[10px] text-gray-400 italic"
-              >
-                (Empty)
-              </div>
-            </TreeNode>
-
-            <!-- Folder: Views (Placeholder) -->
-            <TreeNode label="Views" :has-children="false">
-              <template #icon
-                ><Eye class="w-3.5 h-3.5 text-purple-400"
-              /></template>
-            </TreeNode>
+            </div>
+            <div
+              v-if="tables.length === 0"
+              class="py-2 text-[10px] text-gray-400 italic"
+            >
+              No tables found
+            </div>
           </div>
-        </TreeNode>
+        </transition>
       </div>
 
-      <!-- If no databases found -->
-      <div v-if="databases.length === 0" class="px-6 py-4 text-center">
-        <p class="text-xs text-gray-400 mb-2">No connection</p>
-        <button
-          @click="fetchDatabases"
-          class="px-3 py-1 bg-white border border-gray-200 rounded text-xs text-gray-600 shadow-sm hover:text-blue-600"
+      <!-- No Results -->
+      <div
+        v-if="filteredDatabases.length === 0"
+        class="py-12 flex flex-col items-center justify-center opacity-40 grayscale"
+      >
+        <DatabaseZap class="w-12 h-12 mb-3" />
+        <p
+          class="text-xs font-bold uppercase tracking-widest text-gray-500 text-center"
         >
-          <RefreshCw class="w-3 h-3 inline mr-1" /> Retry
-        </button>
+          No Databases Found
+        </p>
       </div>
     </div>
 
-    <!-- System Admin Section (Fixed Bottom) -->
-    <div class="mt-auto border-t mb-10 border-gray-200 bg-white">
-      <div
-        class="px-3 py-2 bg-gray-50 border-b border-gray-200 text-[10px] font-bold text-gray-400 uppercase tracking-widest"
-      >
-        Administration
-      </div>
-
-      <div class="p-1 space-y-0.5">
+    <!-- Admin Tools Bottom -->
+    <div class="p-4 border-t border-gray-100 bg-gray-50/30">
+      <div class="flex items-center gap-4 px-2 py-1">
         <button
           @click="$emit('navigate', 'admin-users')"
-          class="w-full flex items-center gap-3 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded transition-colors group"
+          class="p-2 text-gray-400 hover:text-blue-600 hover:bg-white rounded-xl transition-all shadow-sm"
         >
-          <User
-            class="w-4 h-4 text-gray-400 group-hover:text-blue-500 relative z-10"
-          />
-          Users & Privileges
+          <User class="w-4 h-4" />
         </button>
         <button
           @click="$emit('navigate', 'admin-status')"
-          class="w-full flex items-center gap-3 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded transition-colors group"
+          class="p-2 text-gray-400 hover:text-amber-600 hover:bg-white rounded-xl transition-all shadow-sm"
         >
-          <Activity class="w-4 h-4 text-gray-400 group-hover:text-blue-500" />
-          Server Status
+          <Activity class="w-4 h-4" />
         </button>
         <button
           @click="$emit('navigate', 'admin-variables')"
-          class="w-full flex items-center gap-3 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded transition-colors group"
+          class="p-2 text-gray-400 hover:text-purple-600 hover:bg-white rounded-xl transition-all shadow-sm"
         >
-          <Settings class="w-4 h-4 text-gray-400 group-hover:text-blue-500" />
-          Variables
+          <Settings class="w-4 h-4" />
+        </button>
+        <div class="flex-1"></div>
+        <button
+          @click="fetchDatabases"
+          class="p-2 text-gray-400 hover:text-emerald-600 hover:bg-white rounded-xl transition-all shadow-sm"
+        >
+          <RefreshCw class="w-4 h-4" />
         </button>
       </div>
     </div>
 
-    <!-- Modals & Menus -->
+    <!-- Modals -->
     <ConnectionModal
       :is-open="isConnectionModalOpen"
       @close="isConnectionModalOpen = false"
@@ -421,7 +280,30 @@ const handleContextSelect = async (action: string) => {
       :y="contextMenuPos.y"
       :items="contextMenuItems"
       @close="contextMenuVisible = false"
-      @select="handleContextSelect"
+      @select="handleContextAction"
     />
   </aside>
 </template>
+
+<style scoped>
+.slide-down-enter-active,
+.slide-down-leave-active {
+  transition: all 0.3s ease;
+  max-height: 500px;
+  opacity: 1;
+}
+.slide-down-enter-from,
+.slide-down-leave-to {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 10px;
+}
+</style>

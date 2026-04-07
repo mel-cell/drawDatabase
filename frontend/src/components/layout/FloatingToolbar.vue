@@ -2,159 +2,150 @@
 import { ref } from "vue";
 import {
   MousePointer2,
-  Hand,
-  Square,
-  StickyNote,
-  Type,
-  ZoomIn,
-  ZoomOut,
-  Redo,
-  Undo,
+  Table as TableIcon,
+  FileText,
   LayoutGrid,
+  Save,
+  Trash2,
+  Code,
 } from "lucide-vue-next";
 
-const emit = defineEmits(["tool-action"]);
+const props = defineProps<{
+  activeDatabase?: string;
+}>();
+
+const emit = defineEmits([
+  "add-table",
+  "add-note",
+  "add-group",
+  "sync",
+  "reset",
+  "open-settings",
+  "toggle-sql",
+]);
 
 const activeTool = ref("pointer");
-const zoomLevel = ref(100);
 
-const setTool = (tool: string) => {
-  if (
-    tool === "add-table" ||
-    tool === "zoom-in" ||
-    tool === "zoom-out" ||
-    tool === "undo" ||
-    tool === "redo"
-  ) {
-    emit("tool-action", tool);
-    // Don't set activeTool for one-off actions
-    return;
-  }
-  activeTool.value = tool;
-  emit("tool-action", tool);
+const tools = [
+  { id: "pointer", icon: MousePointer2, label: "Select Object", shortcut: "V" },
+  {
+    id: "table",
+    icon: TableIcon,
+    label: "New Table",
+    shortcut: "T",
+    action: () => emit("add-table"),
+  },
+  {
+    id: "note",
+    icon: FileText,
+    label: "Add Note",
+    shortcut: "N",
+    action: () => emit("add-note"),
+  },
+  {
+    id: "group",
+    icon: LayoutGrid,
+    label: "Create Group",
+    shortcut: "G",
+    action: () => emit("add-group"),
+  },
+];
+
+const handleToolClick = (tool: any) => {
+  activeTool.value = tool.id;
+  if (tool.action) tool.action();
 };
 </script>
 
 <template>
-  <div
-    class="absolute top-4 left-4 z-20 flex flex-col gap-2 pointer-events-auto"
-  >
-    <!-- Main Tools -->
+  <div class="flex flex-col gap-4 pointer-events-auto">
+    <!-- Main Toolbar -->
     <div
-      class="bg-white rounded-lg shadow-md border border-gray-200 p-1.5 flex flex-col gap-1"
+      class="flex flex-col bg-white/90 backdrop-blur-md border border-gray-200 p-1.5 rounded-2xl shadow-xl space-y-1"
     >
-      <button
-        @click="setTool('pointer')"
-        class="p-2 rounded hover:bg-gray-100 transition-colors tooltip relative group"
-        :class="{
-          'bg-blue-50 text-blue-600': activeTool === 'pointer',
-          'text-gray-600': activeTool !== 'pointer',
-        }"
-      >
-        <MousePointer2 class="w-5 h-5" />
-        <span class="tooltip-text">Select</span>
-      </button>
+      <div v-for="tool in tools" :key="tool.id" class="relative group">
+        <button
+          @click="handleToolClick(tool)"
+          class="w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-200 relative"
+          :class="
+            activeTool === tool.id
+              ? 'bg-blue-600 text-white shadow-lg'
+              : 'text-gray-500 hover:bg-gray-100'
+          "
+        >
+          <component :is="tool.icon" class="w-5 h-5" />
 
-      <button
-        @click="setTool('hand')"
-        class="p-2 rounded hover:bg-gray-100 transition-colors tooltip relative group"
-        :class="{
-          'bg-blue-50 text-blue-600': activeTool === 'hand',
-          'text-gray-600': activeTool !== 'hand',
-        }"
-      >
-        <Hand class="w-5 h-5" />
-        <span class="tooltip-text">Pan</span>
-      </button>
+          <!-- Tooltip -->
+          <div
+            class="absolute left-14 px-3 py-1.5 bg-gray-900 text-white text-[10px] font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 transform translate-x-[-10px] group-hover:translate-x-0 whitespace-nowrap z-50 shadow-xl"
+          >
+            {{ tool.label }}
+            <span v-if="tool.shortcut" class="ml-2 text-gray-400 font-mono">{{
+              tool.shortcut
+            }}</span>
+            <div
+              class="absolute left-[-4px] top-1/2 -translate-y-1/2 border-8 border-transparent border-r-gray-900"
+            ></div>
+          </div>
+        </button>
+      </div>
 
-      <div class="h-px bg-gray-200 my-0.5"></div>
+      <div class="h-px bg-gray-100 mx-2 my-1"></div>
 
-      <button
-        @click="setTool('add-table')"
-        class="p-2 rounded hover:bg-gray-100 transition-colors tooltip relative group"
-        :class="{
-          'bg-blue-50 text-blue-600': activeTool === 'add-table',
-          'text-gray-600': activeTool !== 'add-table',
-        }"
-      >
-        <Square class="w-5 h-5" />
-        <span class="tooltip-text">Add Table</span>
-      </button>
+      <!-- Action Buttons -->
+      <div class="relative group">
+        <button
+          @click="emit('sync')"
+          class="w-10 h-10 flex items-center justify-center rounded-xl text-emerald-600 hover:bg-emerald-100 transition-all"
+        >
+          <Save class="w-5 h-5" />
+          <div
+            class="absolute left-14 px-3 py-1.5 bg-emerald-600 text-white text-[10px] font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 transform translate-x-[-10px] group-hover:translate-x-0 whitespace-nowrap z-50 shadow-xl"
+          >
+            Sync to Database
+            <div
+              class="absolute left-[-4px] top-1/2 -translate-y-1/2 border-8 border-transparent border-r-emerald-600"
+            ></div>
+          </div>
+        </button>
+      </div>
 
-      <button
-        @click="setTool('note')"
-        class="p-2 rounded hover:bg-gray-100 transition-colors tooltip relative group"
-        :class="{
-          'bg-blue-50 text-blue-600': activeTool === 'note',
-          'text-gray-600': activeTool !== 'note',
-        }"
-      >
-        <StickyNote class="w-5 h-5" />
-        <span class="tooltip-text">Add Note</span>
-      </button>
-
-      <button
-        @click="setTool('text')"
-        class="p-2 rounded hover:bg-gray-100 transition-colors tooltip relative group"
-        :class="{
-          'bg-blue-50 text-blue-600': activeTool === 'text',
-          'text-gray-600': activeTool !== 'text',
-        }"
-      >
-        <Type class="w-5 h-5" />
-        <span class="tooltip-text">Add Text</span>
-      </button>
-
-      <button
-        @click="setTool('group')"
-        class="p-2 rounded hover:bg-gray-100 transition-colors tooltip relative group"
-        :class="{
-          'bg-blue-50 text-blue-600': activeTool === 'group',
-          'text-gray-600': activeTool !== 'group',
-        }"
-      >
-        <LayoutGrid class="w-5 h-5" />
-        <span class="tooltip-text">Add Group</span>
-      </button>
+      <div class="relative group">
+        <button
+          @click="emit('toggle-sql')"
+          class="w-10 h-10 flex items-center justify-center rounded-xl text-amber-600 hover:bg-amber-100 transition-all"
+        >
+          <Code class="w-5 h-5" />
+          <div
+            class="absolute left-14 px-3 py-1.5 bg-amber-600 text-white text-[10px] font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 transform translate-x-[-10px] group-hover:translate-x-0 whitespace-nowrap z-50 shadow-xl"
+          >
+            View SQL Preview
+            <div
+              class="absolute left-[-4px] top-1/2 -translate-y-1/2 border-8 border-transparent border-r-amber-600"
+            ></div>
+          </div>
+        </button>
+      </div>
     </div>
 
-    <!-- Zoom & History -->
+    <!-- Secondary Toolbar -->
     <div
-      class="bg-white rounded-lg shadow-md border border-gray-200 p-1.5 flex flex-col gap-1"
+      class="flex flex-col bg-white/90 backdrop-blur-md border border-gray-200 p-1.5 rounded-2xl shadow-lg"
     >
       <button
-        class="p-2 text-gray-600 hover:bg-gray-100 rounded"
-        @click="zoomLevel += 10"
+        @click="emit('reset')"
+        class="w-10 h-10 flex items-center justify-center rounded-xl text-red-500 hover:bg-red-100 transition-all group relative"
       >
-        <ZoomIn class="w-5 h-5" />
-      </button>
-      <div class="text-[10px] text-center font-mono py-1 text-gray-500">
-        {{ zoomLevel }}%
-      </div>
-      <button
-        class="p-2 text-gray-600 hover:bg-gray-100 rounded"
-        @click="zoomLevel -= 10"
-      >
-        <ZoomOut class="w-5 h-5" />
-      </button>
-
-      <div class="h-px bg-gray-200 my-0.5"></div>
-
-      <button class="p-2 text-gray-600 hover:bg-gray-100 rounded">
-        <Undo class="w-5 h-5" />
-      </button>
-      <button class="p-2 text-gray-600 hover:bg-gray-100 rounded">
-        <Redo class="w-5 h-5" />
+        <Trash2 class="w-5 h-5" />
+        <div
+          class="absolute left-14 px-3 py-1.5 bg-red-600 text-white text-[10px] font-bold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 whitespace-nowrap z-50 shadow-xl"
+        >
+          Clear Canvas
+          <div
+            class="absolute left-[-4px] top-1/2 -translate-y-1/2 border-8 border-transparent border-r-red-600"
+          ></div>
+        </div>
       </button>
     </div>
   </div>
 </template>
-
-<style scoped>
-.tooltip-text {
-  @apply absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 pointer-events-none transition-opacity whitespace-nowrap z-50;
-}
-.group:hover .tooltip-text {
-  @apply opacity-100;
-}
-</style>

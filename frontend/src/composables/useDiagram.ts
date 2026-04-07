@@ -1,80 +1,54 @@
-import { ref, watch, onMounted } from "vue";
-import { useVueFlow, type Connection } from "@vue-flow/core";
-import { useSchema, type TableSchema, type RelationSchema } from "./useSchema";
+import { ref } from "vue";
+import { useVueFlow, type Connection, type Edge, type Node } from "@vue-flow/core";
+import { useSchema } from "./useSchema";
 
 // GLOBAL STATE (Singleton)
-const nodes = ref<any[]>([]);
-const edges = ref<any[]>([]);
+const nodes = ref<Node[]>([]);
+const edges = ref<Edge[]>([]);
 
 export function useDiagram() {
-  const { onConnect, addEdges: flowAddEdges } = useVueFlow(); // VueFlow adds logic
-  const { tables, relations, fetchSchema, currentDatabase } = useSchema();
+  const { onConnect } = useVueFlow();
+  const { tables, relations, syncBatch } = useSchema();
 
   // Helper to remove node globally
   const removeNode = (id: string) => {
-    const idx = nodes.value.findIndex((n) => n.id === id);
-    if (idx > -1) {
-      nodes.value.splice(idx, 1);
-    }
-  };
-
-  // Helper to format type
-  const formatType = (col: any) => {
-    let t = col.type.toUpperCase();
-    if (col.is_pk) t += " PK";
-    else if (col.is_fk) t += " FK";
-    return t;
+    nodes.value = nodes.value.filter(n => n.id !== id);
+    // Also remove connected edges
+    edges.value = edges.value.filter(e => e.source !== id && e.target !== id);
   };
 
   const syncDiagram = async (forceReset = false) => {
-    // Layout Config
-    let x = 100;
-    let y = 100;
-    const GAP_X = 350;
-    const GAP_Y = 300;
-    const COLS_PER_ROW = 3;
-
-    // Reset if forced (e.g. DB change)
-    if (forceReset || tables.value.length === 0) {
+    if (forceReset) {
       nodes.value = [];
       edges.value = [];
     }
 
-    // Only sync if nodes are empty (initial load or after reset) to avoid overwriting drags
     if (nodes.value.length === 0 && tables.value.length > 0) {
-      // Fetch Layout
+      // Fetch Layout (Optional)
       let savedLayouts: any = {};
       try {
         const res = await fetch("http://localhost:3000/api/layout");
         if (res.ok) savedLayouts = await res.json();
       } catch (e) {
-        console.warn("No layout found");
+        console.warn("Layout server not available");
       }
 
-      nodes.value = tables.value.map((table: TableSchema, index: number) => {
-        const col = index % COLS_PER_ROW;
-        const row = Math.floor(index / COLS_PER_ROW);
-
-        // Use saved position or calculate new one
-        let posX = x + col * GAP_X;
-        let posY = y + row * GAP_Y;
-
-        if (savedLayouts[table.name]) {
-          posX = savedLayouts[table.name].x;
-          posY = savedLayouts[table.name].y;
-        }
+      nodes.value = tables.value.map((table, index) => {
+        const posX = savedLayouts[table.name]?.x ?? (100 + (index % 3) * 350);
+        const posY = savedLayouts[table.name]?.y ?? (100 + Math.floor(index / 3) * 300);
 
         return {
           id: table.name,
           type: "table",
           position: { x: posX, y: posY },
           data: {
-            name: table.name, // Ensure consistent naming logic
-            label: table.name,
-            columns: table.columns.map((c) => ({
+            name: table.name,
+            headerColor: "#ffffff", // Default
+            columns: table.columns.map(c => ({
               name: c.name,
-              type: formatType(c),
+              type: c.type,
               is_pk: c.is_pk,
+              is_nn: true,
               is_fk: c.is_fk,
             })),
           },
@@ -82,58 +56,85 @@ export function useDiagram() {
       });
     }
 
-    // Transform Relations to Edges
     if (edges.value.length === 0 && relations.value.length > 0) {
-      edges.value = relations.value.map(
-        (rel: RelationSchema, index: number) => ({
-          id: `e-${index}`,
-          source: rel.source_table,
-          target: rel.target_table,
-          sourceHandle: `source-${rel.source_column}`,
-          targetHandle: `target-${rel.target_column}`,
-          label: "FK",
-          animated: true,
-          style: { stroke: "#2563eb", strokeWidth: 2 },
-          type: "smoothstep",
-        })
-      );
+      edges.value = relations.value.map((rel, index) => ({
+        id: `e-${index}-${Date.now()}`,
+        source: rel.source_table,
+        target: rel.target_table,
+        sourceHandle: `source-${rel.source_column}`,
+        targetHandle: `target-${rel.target_column}`,
+        label: "FK",
+        animated: true,
+        style: { stroke: "#3b82f6", strokeWidth: 2 },
+        type: "smoothstep",
+      }));
     }
   };
 
-  // Initial Fetch
-  onMounted(async () => {
-    if (currentDatabase.value) {
-      if (tables.value.length === 0) await fetchSchema();
-      syncDiagram();
-    } else {
-      nodes.value = [];
-      edges.value = [];
-    }
-  });
-
-  // Watch for Database Switch
-  watch(currentDatabase, () => {
-    // Force reset canvas when DB changes
-    syncDiagram(true);
-  });
-
-  // Watch for schema changes (e.g. creating tables in same DB)
-  watch(
-    [tables, relations],
-    () => {
-      syncDiagram(false); // Soft sync (only if empty)
-    },
-    { deep: true }
-  );
-
-  // Setup Event Handlers
+  // Setup Connection Handler
   onConnect((params: Connection) => {
-    flowAddEdges([params]);
+    const newEdge = {
+        ...params,
+        id: `e-${Date.now()}`,
+        animated: true,
+        label: "FK",
+        style: { stroke: "#3b82f6", strokeWidth: 2 },
+        type: "smoothstep",
+    };
+    edges.value.push(newEdge as Edge);
   });
+
+  const saveAll = async () => {
+    const tableRequests = nodes.value
+      .filter(n => n.type === "table")
+      .map(n => {
+        const d = n.data;
+        // Find edges where this table is the source (has FK pointing out)
+        const fks = edges.value
+          .filter(e => e.source === n.id)
+          .map(e => ({
+            column_name: e.sourceHandle?.replace("source-", "") || "",
+            ref_table_name: e.target,
+            ref_column_name: e.targetHandle?.replace("target-", "") || "id",
+          }))
+          .filter(f => f.column_name);
+
+        return {
+          name: d.name,
+          columns: d.columns.map((c: any) => ({
+            name: c.name,
+            type: c.type,
+            is_pk: c.is_pk,
+            is_nn: c.is_nn ?? true,
+            is_ai: c.is_ai ?? false,
+          })),
+          foreign_keys: fks,
+        };
+      });
+
+    const success = await syncBatch(tableRequests);
+    if (success) {
+      // Save Layout Positions
+      const positions: Record<string, {x: number, y: number}> = {};
+      nodes.value.forEach(n => {
+          positions[n.id] = { x: Math.round(n.position.x), y: Math.round(n.position.y) };
+      });
+      
+      await fetch("http://localhost:3000/api/layout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(positions)
+      });
+      
+      alert("Changes synced to database successfully!");
+    }
+  };
 
   return {
     nodes,
     edges,
     removeNode,
+    saveAll,
+    syncDiagram
   };
 }
