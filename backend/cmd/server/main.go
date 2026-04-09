@@ -23,7 +23,7 @@ func main() {
 	infraDB.Connect(cfg.DSN)
     
     // 3. Dependency Injection (Modern Style)
-    repo := mysql.NewMySQLRepository(infraDB.DB)
+    repo := mysql.NewMySQLRepository(&infraDB.DB)
     
     syncSvc := schema.NewSyncService(repo)
     dbSvc := appDB.NewDatabaseService(repo)

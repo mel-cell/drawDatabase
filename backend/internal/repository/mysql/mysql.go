@@ -11,33 +11,56 @@ import (
 )
 
 type mysqlRepository struct {
-	db *gorm.DB
+	db **gorm.DB
 }
 
-func NewMySQLRepository(db *gorm.DB) domain.SchemaRepository {
+func NewMySQLRepository(db **gorm.DB) domain.SchemaRepository {
 	return &mysqlRepository{db: db}
+}
+
+func (r *mysqlRepository) getDB() (*gorm.DB, error) {
+	if r.db == nil || *r.db == nil {
+		return nil, fmt.Errorf("database connection not established")
+	}
+	return *r.db, nil
 }
 
 // Database Operations
 func (r *mysqlRepository) GetDatabases(ctx context.Context) ([]string, error) {
+	db, err := r.getDB()
+	if err != nil {
+		return nil, err
+	}
 	var databases []string
-	if err := r.db.Raw("SHOW DATABASES").Scan(&databases).Error; err != nil {
+	if err := db.Raw("SHOW DATABASES").Scan(&databases).Error; err != nil {
 		return nil, err
 	}
 	return databases, nil
 }
 
 func (r *mysqlRepository) CreateDatabase(ctx context.Context, name string) error {
-	return r.db.WithContext(ctx).Exec(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s`", name)).Error
+	db, err := r.getDB()
+	if err != nil {
+		return err
+	}
+	return db.WithContext(ctx).Exec(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s`", name)).Error
 }
 
 func (r *mysqlRepository) DropDatabase(ctx context.Context, name string) error {
-	return r.db.WithContext(ctx).Exec(fmt.Sprintf("DROP DATABASE IF EXISTS `%s`", name)).Error
+	db, err := r.getDB()
+	if err != nil {
+		return err
+	}
+	return db.WithContext(ctx).Exec(fmt.Sprintf("DROP DATABASE IF EXISTS `%s`", name)).Error
 }
 
 // Schema Operations
 func (r *mysqlRepository) GetFullSchema(ctx context.Context, dbName string) (*domain.DatabaseSchema, error) {
-	tx := r.db.WithContext(ctx)
+	db, err := r.getDB()
+	if err != nil {
+		return nil, err
+	}
+	tx := db.WithContext(ctx)
 	if dbName != "" {
 		tx = tx.Exec("USE " + dbName)
 	}
@@ -105,7 +128,11 @@ func (r *mysqlRepository) GetFullSchema(ctx context.Context, dbName string) (*do
 }
 
 func (r *mysqlRepository) SyncBatch(ctx context.Context, dbName string, reqs []domain.TableRequest) error {
-	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	db, err := r.getDB()
+	if err != nil {
+		return err
+	}
+	return db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if dbName != "" {
 			if err := tx.Exec(fmt.Sprintf("USE `%s`", dbName)).Error; err != nil {
 				return err
@@ -197,12 +224,20 @@ func (r *mysqlRepository) SyncBatch(ctx context.Context, dbName string, reqs []d
 }
 
 func (r *mysqlRepository) DropTable(ctx context.Context, name string) error {
-	return r.db.WithContext(ctx).Exec(fmt.Sprintf("DROP TABLE IF EXISTS `%s`", name)).Error
+	db, err := r.getDB()
+	if err != nil {
+		return err
+	}
+	return db.WithContext(ctx).Exec(fmt.Sprintf("DROP TABLE IF EXISTS `%s`", name)).Error
 }
 
 // Data Operations
 func (r *mysqlRepository) GetTableData(ctx context.Context, tableName string, limit, offset int) (*domain.TableData, error) {
-	tx := r.db.WithContext(ctx)
+	db, err := r.getDB()
+	if err != nil {
+		return nil, err
+	}
+	tx := db.WithContext(ctx)
 	var dbColumns []struct { Field string }
 	if err := tx.Raw(fmt.Sprintf("SHOW COLUMNS FROM `%s`", tableName)).Scan(&dbColumns).Error; err != nil {
 		return nil, err
@@ -221,6 +256,10 @@ func (r *mysqlRepository) GetTableData(ctx context.Context, tableName string, li
 }
 
 func (r *mysqlRepository) InsertData(ctx context.Context, tableName string, data map[string]interface{}) error {
+	db, err := r.getDB()
+	if err != nil {
+		return err
+	}
 	cols := []string{}; vals := []interface{}{}; phs := []string{}
 	for k, v := range data {
 		cols = append(cols, fmt.Sprintf("`%s`", k))
@@ -228,35 +267,51 @@ func (r *mysqlRepository) InsertData(ctx context.Context, tableName string, data
 		phs = append(phs, "?")
 	}
 	query := fmt.Sprintf("INSERT INTO `%s` (%s) VALUES (%s)", tableName, strings.Join(cols, ","), strings.Join(phs, ","))
-	return r.db.WithContext(ctx).Exec(query, vals...).Error
+	return db.WithContext(ctx).Exec(query, vals...).Error
 }
 
 func (r *mysqlRepository) DeleteData(ctx context.Context, tableName string, condition map[string]interface{}) error {
-	tx := r.db.WithContext(ctx).Table(tableName)
+	db, err := r.getDB()
+	if err != nil {
+		return err
+	}
+	tx := db.WithContext(ctx).Table(tableName)
 	for k, v := range condition { tx = tx.Where(fmt.Sprintf("`%s` = ?", k), v) }
 	return tx.Delete(nil).Error
 }
 
 func (r *mysqlRepository) ExecuteRaw(ctx context.Context, query string) ([]map[string]interface{}, error) {
+    db, err := r.getDB()
+	if err != nil {
+        return nil, err
+    }
     var results []map[string]interface{}
-    if err := r.db.WithContext(ctx).Raw(query).Scan(&results).Error; err != nil {
+    if err := db.WithContext(ctx).Raw(query).Scan(&results).Error; err != nil {
         return nil, err
     }
     return results, nil
 }
 
 func (r *mysqlRepository) SaveLayout(ctx context.Context, layouts map[string]interface{}) error {
-    r.db.Exec(`CREATE TABLE IF NOT EXISTS _layout (table_name VARCHAR(255) PRIMARY KEY, x INT, y INT)`)
+    db, err := r.getDB()
+	if err != nil {
+        return err
+    }
+    db.Exec(`CREATE TABLE IF NOT EXISTS _layout (table_name VARCHAR(255) PRIMARY KEY, x INT, y INT)`)
     for name, pos := range layouts {
         p := pos.(map[string]interface{})
-        r.db.Exec("REPLACE INTO _layout (table_name, x, y) VALUES (?, ?, ?)", name, p["x"], p["y"])
+        db.Exec("REPLACE INTO _layout (table_name, x, y) VALUES (?, ?, ?)", name, p["x"], p["y"])
     }
     return nil
 }
 
 func (r *mysqlRepository) GetLayout(ctx context.Context) (map[string]interface{}, error) {
+    db, err := r.getDB()
+	if err != nil {
+        return nil, err
+    }
     var rows []struct { TableName string; X int; Y int }
-    if err := r.db.Raw("SELECT * FROM _layout").Scan(&rows).Error; err != nil { return nil, err }
+    if err := db.Raw("SELECT * FROM _layout").Scan(&rows).Error; err != nil { return nil, err }
     res := make(map[string]interface{})
     for _, r := range rows { res[r.TableName] = map[string]int{"x": r.X, "y": r.Y} }
     return res, nil
