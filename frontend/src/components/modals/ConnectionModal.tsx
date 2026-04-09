@@ -230,14 +230,6 @@ export default function ConnectionModal({ isOpen, onClose, onConnect }: Connecti
                     </div>
                     <span className="font-medium text-blue-900 text-sm">MySQL</span>
                   </label>
-                  <label className="flex items-center gap-2 p-3 border border-gray-200 rounded-lg cursor-not-allowed opacity-40">
-                    <div className="w-8 h-8 bg-indigo-600 rounded flex items-center justify-center text-white font-bold text-xs">PG</div>
-                    <span className="font-medium text-gray-700 text-sm">PostgreSQL</span>
-                  </label>
-                  <label className="flex items-center gap-2 p-3 border border-gray-200 rounded-lg cursor-not-allowed opacity-40">
-                    <div className="w-8 h-8 bg-emerald-600 rounded flex items-center justify-center text-white font-bold text-xs">SQ</div>
-                    <span className="font-medium text-gray-700 text-sm">SQLite</span>
-                  </label>
                 </div>
               </div>
 

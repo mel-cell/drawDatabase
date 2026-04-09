@@ -1,10 +1,10 @@
 [
   {
     "name": "Local MySQL",
-    "host": "127.0.0.1",
+    "host": "localhost",
     "port": 3306,
     "user": "mel",
     "password": "root",
-    "database": ""
+    "database": "test_db"
   }
 ]

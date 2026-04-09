@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 export interface DatabaseConnection {
   name: string;
@@ -17,68 +18,78 @@ interface ConnectionState {
   saveConnection: (conn: DatabaseConnection) => Promise<boolean>;
   deleteConnection: (name: string) => Promise<boolean>;
   testConnection: (conn: DatabaseConnection) => Promise<boolean>;
-  setActiveConnection: (conn: DatabaseConnection) => void;
+  setActiveConnection: (conn: DatabaseConnection | null) => void;
 }
 
-const API_URL = 'http://localhost:3000/api/connections';
+const API_URL = '/api/connections';
 
-export const useConnectionStore = create<ConnectionState>((set) => ({
-  connections: [],
-  activeConnection: null,
+export const useConnectionStore = create<ConnectionState>()(
+  persist(
+    (set) => ({
+      connections: [],
+      activeConnection: null,
 
-  setActiveConnection: (conn) => set({ activeConnection: conn }),
+      setActiveConnection: (conn) => set({ activeConnection: conn }),
 
-  fetchConnections: async () => {
-    try {
-      const res = await fetch(API_URL);
-      if (!res.ok) throw new Error('Failed to fetch connections');
-      const data = await res.json();
-      set({ connections: data });
-    } catch (error) {
-      console.error('Error fetching connections:', error);
-      set({ connections: [] });
+      fetchConnections: async () => {
+        try {
+          const res = await fetch(API_URL);
+          if (!res.ok) {
+            set({ connections: [] });
+            return;
+          }
+          const data = await res.json();
+          set({ connections: Array.isArray(data) ? data : [] });
+        } catch (error) {
+          console.error('Error fetching connections:', error);
+          set({ connections: [] });
+        }
+      },
+
+      saveConnection: async (conn) => {
+        try {
+          const res = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(conn)
+          });
+          if (!res.ok) throw new Error('Failed to save connection');
+          return true;
+        } catch (error) {
+          console.error('Error saving connection:', error);
+          return false;
+        }
+      },
+
+      testConnection: async (conn) => {
+        try {
+          const res = await fetch(`${API_URL}/test`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(conn)
+          });
+          return res.ok;
+        } catch (error) {
+          console.error('Error testing connection:', error);
+          return false;
+        }
+      },
+
+      deleteConnection: async (name: string) => {
+        try {
+          const res = await fetch(`${API_URL}?name=${encodeURIComponent(name)}`, {
+            method: 'DELETE'
+          });
+          if (!res.ok) throw new Error('Failed to delete connection');
+          return true;
+        } catch (error) {
+          console.error('Error deleting connection:', error);
+          return false;
+        }
+      }
+    }),
+    {
+      name: 'connection-storage', // Kunci di LocalStorage
     }
-  },
-
-  saveConnection: async (conn) => {
-    try {
-      const res = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(conn)
-      });
-      if (!res.ok) throw new Error('Failed to save connection');
-      return true;
-    } catch (error) {
-      console.error('Error saving connection:', error);
-      return false;
-    }
-  },
-
-  testConnection: async (conn) => {
-    try {
-      const res = await fetch(`${API_URL}/test`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(conn)
-      });
-      return res.ok;
-    } catch (error) {
-      console.error('Error testing connection:', error);
-      return false;
-    }
-  },
-
-  deleteConnection: async (name: string) => {
-    try {
-      const res = await fetch(`${API_URL}?name=${encodeURIComponent(name)}`, {
-        method: 'DELETE'
-      });
-      if (!res.ok) throw new Error('Failed to delete connection');
-      return true;
-    } catch (error) {
-      console.error('Error deleting connection:', error);
-      return false;
-    }
-  }
-}));
+  )
+);
