@@ -29,20 +29,6 @@ export default function PropertyPanel() {
     }
   }, [selectedNode]);
 
-  if (!selectedNode) {
-    return (
-      <aside className="w-[350px] border-l border-slate-200 bg-white hidden lg:flex flex-col items-center justify-center p-12 text-center">
-         <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 text-slate-300">
-            <Settings className="w-8 h-8" />
-         </div>
-         <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest">Property Panel</h3>
-         <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-            Select a table on the canvas to edit its properties, columns, ddan relations.
-         </p>
-      </aside>
-    );
-  }
-
   // Auto-update Canvas when tableName or columns change locally
   useEffect(() => {
     if (selectedNode) {
