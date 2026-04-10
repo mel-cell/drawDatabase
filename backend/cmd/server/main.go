@@ -23,7 +23,7 @@ func main() {
 	infraDB.Connect(cfg.DSN)
     
     // 3. Dependency Injection (Modern Style)
-    repo := mysql.NewMySQLRepository(&infraDB.DB)
+    repo := mysql.NewMySQLRepository(infraDB.DB)
     
     syncSvc := schema.NewSyncService(repo)
     dbSvc := appDB.NewDatabaseService(repo)
@@ -37,7 +37,7 @@ func main() {
 	app.Use(cors.New())
 
 	// 6. Setup Routes (Connect Services to Handlers)
-	routes.SetupRoutes(app, syncSvc, dbSvc, dataSvc, layoutSvc)
+	routes.SetupRoutes(app, syncSvc, dbSvc, dataSvc, layoutSvc, repo)
 
 	// 7. Start Server
 	log.Printf("Server listening on port %s (Clean Architecture)", cfg.ServerPort)

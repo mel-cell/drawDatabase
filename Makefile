@@ -7,7 +7,7 @@ dev:
 
 dev-backend:
 	@echo "Starting Backend..."
-	@cd backend && air || go run cmd/server/main.go
+	@cd backend && go run cmd/server/main.go
 
 dev-frontend:
 	@echo "Starting Frontend..."

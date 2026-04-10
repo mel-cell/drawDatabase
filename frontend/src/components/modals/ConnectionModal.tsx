@@ -14,6 +14,8 @@ import {
   AlertCircle,
   Wifi,
   Loader2,
+  Play,
+  Edit2,
 } from 'lucide-react';
 
 interface ConnectionModalProps {
@@ -23,7 +25,7 @@ interface ConnectionModalProps {
 }
 
 export default function ConnectionModal({ isOpen, onClose, onConnect }: ConnectionModalProps) {
-  const { connections, fetchConnections, saveConnection, testConnection, deleteConnection, setActiveConnection } = useConnectionStore();
+  const { connections, fetchConnections, saveConnection, testConnection, deleteConnection, setActiveConnection, applyConnection } = useConnectionStore();
 
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
   const [isTesting, setIsTesting] = useState(false);
@@ -64,6 +66,21 @@ export default function ConnectionModal({ isOpen, onClose, onConnect }: Connecti
       });
     }
     setTestStatus('none');
+  };
+
+  const handleApplyDirectly = async (conn: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    toast.loading(`Connecting to ${conn.name}...`);
+    const ok = await applyConnection(conn);
+    toast.dismiss();
+    
+    if (ok) {
+        toast.success(`Connected to ${conn.name}`);
+        onConnect();
+        onClose();
+    } else {
+        toast.error(`Failed to connect to ${conn.name}. Check if MySQL is running.`);
+    }
   };
 
   const createNew = () => {
@@ -107,6 +124,7 @@ export default function ConnectionModal({ isOpen, onClose, onConnect }: Connecti
 
   const handleDelete = async (name: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!confirm(`Delete connection "${name}"?`)) return;
     const ok = await deleteConnection(name);
     if(ok) {
         toast.warning(`Connection ${name} deleted.`);
@@ -121,12 +139,18 @@ export default function ConnectionModal({ isOpen, onClose, onConnect }: Connecti
   };
 
   const handleConnect = async () => {
+    // 1. Save first to update password/details
     const saved = await handleSave();
     if(saved) {
-        setActiveConnection(form);
-        toast.success(`Connected to ${form.name}`);
-        onConnect();
-        onClose();
+        // 2. Apply it globally on server
+        const applied = await applyConnection(form);
+        if (applied) {
+            toast.success(`Connected to ${form.name}`);
+            onConnect();
+            onClose();
+        } else {
+            toast.error("Saved, but failed to establish live connection.");
+        }
     }
   };
 
@@ -158,7 +182,7 @@ export default function ConnectionModal({ isOpen, onClose, onConnect }: Connecti
                 key={conn.name}
                 onClick={() => selectConn(idx)}
                 className={cn(
-                  "px-3 py-3 rounded-lg cursor-pointer transition-all flex items-center gap-3 border group",
+                  "px-3 py-3 rounded-lg cursor-pointer transition-all flex items-center gap-3 border group relative",
                   selectedIndex === idx ? "bg-white border-gray-200 shadow-sm" : "border-transparent hover:bg-gray-100"
                 )}
               >
@@ -169,12 +193,31 @@ export default function ConnectionModal({ isOpen, onClose, onConnect }: Connecti
                   <div className="text-sm font-semibold text-gray-800 truncate">{conn.name}</div>
                   <div className="text-[10px] text-gray-500 truncate">{conn.user}@{conn.host}</div>
                 </div>
-                <button
-                  onClick={(e) => handleDelete(conn.name, e)}
-                  className="p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                
+                {/* ACTIONS ON HOVER */}
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity translate-x-1 group-hover:translate-x-0">
+                  <button
+                    onClick={(e) => handleApplyDirectly(conn, e)}
+                    className="p-1.5 text-emerald-500 hover:bg-emerald-50 rounded-md transition-colors"
+                    title="Start Connection"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-current" />
+                  </button>
+                  <button
+                    onClick={() => selectConn(idx)}
+                    className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-md transition-colors"
+                    title="Edit Config"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={(e) => handleDelete(conn.name, e)}
+                    className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                    title="Delete"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             ))}
 

@@ -13,6 +13,7 @@ func SetupRoutes(
 	dbService domain.DatabaseService,
 	dataService domain.DataService,
 	layoutService domain.LayoutService,
+	repo domain.SchemaRepository,
 ) {
 	api := app.Group("/api")
 
@@ -41,9 +42,10 @@ func SetupRoutes(
 	api.Post("/layout", layoutH.Save)
 
 	// Connection Management
-	connH := _handlers.NewConnectionHandler()
+	connH := _handlers.NewConnectionHandler(repo)
 	api.Get("/connections", connH.List)
 	api.Post("/connections", connH.Save)
+	api.Post("/connections/apply", connH.Apply)
 	api.Post("/connections/test", connH.Test)
 	api.Delete("/connections", connH.Delete)
 }

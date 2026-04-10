@@ -6,23 +6,33 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 
 	"gorm.io/gorm"
 )
 
 type mysqlRepository struct {
-	db **gorm.DB
+	db *gorm.DB
+	mu sync.RWMutex
 }
 
-func NewMySQLRepository(db **gorm.DB) domain.SchemaRepository {
+func NewMySQLRepository(db *gorm.DB) domain.SchemaRepository {
 	return &mysqlRepository{db: db}
 }
 
+func (r *mysqlRepository) SetDB(db *gorm.DB) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.db = db
+}
+
 func (r *mysqlRepository) getDB() (*gorm.DB, error) {
-	if r.db == nil || *r.db == nil {
-		return nil, fmt.Errorf("database connection not established")
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.db == nil {
+		return nil, fmt.Errorf("database connection not established. please configure connection in settings")
 	}
-	return *r.db, nil
+	return r.db, nil
 }
 
 // Database Operations

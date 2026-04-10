@@ -90,7 +90,8 @@ func GetConnections() ([]ConnectionConfig, error) {
 
 	var conns []ConnectionConfig
 	if err := json.Unmarshal(data, &conns); err != nil {
-		return nil, err
+		// If JSON is corrupted, return empty list instead of crashing
+		return []ConnectionConfig{}, nil
 	}
 	return conns, nil
 }

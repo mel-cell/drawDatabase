@@ -1,6 +1,10 @@
 package domain
 
-import "context"
+import (
+	"context"
+
+	"gorm.io/gorm"
+)
 
 // Entities (Data Structures)
 type ColumnDefinition struct {
@@ -59,6 +63,7 @@ type TableData struct {
 
 // Repositories Interfaces (DB Access)
 type SchemaRepository interface {
+	SetDB(db *gorm.DB)
 	GetDatabases(ctx context.Context) ([]string, error)
 	CreateDatabase(ctx context.Context, name string) error
 	DropDatabase(ctx context.Context, name string) error

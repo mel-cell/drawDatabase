@@ -18,18 +18,22 @@ interface ConnectionState {
   saveConnection: (conn: DatabaseConnection) => Promise<boolean>;
   deleteConnection: (name: string) => Promise<boolean>;
   testConnection: (conn: DatabaseConnection) => Promise<boolean>;
+  applyConnection: (conn: DatabaseConnection) => Promise<boolean>;
   setActiveConnection: (conn: DatabaseConnection | null) => void;
+  disconnect: () => void;
 }
 
 const API_URL = '/api/connections';
 
 export const useConnectionStore = create<ConnectionState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       connections: [],
       activeConnection: null,
 
       setActiveConnection: (conn) => set({ activeConnection: conn }),
+      
+      disconnect: () => set({ activeConnection: null }),
 
       fetchConnections: async () => {
         try {
@@ -57,6 +61,24 @@ export const useConnectionStore = create<ConnectionState>()(
           return true;
         } catch (error) {
           console.error('Error saving connection:', error);
+          return false;
+        }
+      },
+
+      applyConnection: async (conn) => {
+        try {
+          const res = await fetch(`${API_URL}/apply`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(conn)
+          });
+          if (res.ok) {
+            set({ activeConnection: conn });
+            return true;
+          }
+          return false;
+        } catch (error) {
+          console.error('Error applying connection:', error);
           return false;
         }
       },

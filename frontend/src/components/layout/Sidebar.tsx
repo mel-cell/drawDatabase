@@ -31,7 +31,7 @@ export default function Sidebar() {
     dropDatabase 
   } = useSchemaStore();
   
-  const { activeConnection } = useConnectionStore();
+  const { activeConnection, applyConnection } = useConnectionStore();
   const [search, setSearch] = useState('');
   
   // Context Menu State
@@ -39,10 +39,17 @@ export default function Sidebar() {
   const [menuTarget, setMenuTarget] = useState<string | null>(null);
 
   useEffect(() => {
-    if (activeConnection) {
-      fetchDatabases();
-    }
-  }, [activeConnection, fetchDatabases]);
+    const initSidebar = async () => {
+      if (activeConnection) {
+        // 1. Pastikan backend sinkron dengan koneksi aktif kita (Auto-Apply)
+        await applyConnection(activeConnection);
+        // 2. Baru tarik database-nya
+        await fetchDatabases();
+      }
+    };
+    
+    initSidebar();
+  }, [activeConnection, fetchDatabases, applyConnection]);
 
   const handleContextMenu = (e: React.MouseEvent, db: string) => {
     e.preventDefault();
