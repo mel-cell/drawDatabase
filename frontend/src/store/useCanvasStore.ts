@@ -1,6 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { 
   addEdge, 
   applyNodeChanges, 
@@ -26,43 +27,53 @@ interface CanvasState {
   setEdges: (edges: Edge[]) => void;
   setSelectedNode: (node: Node | null) => void;
   updateNodeData: (nodeId: string, data: any) => void;
+  clearDraft: () => void;
 }
 
-export const useCanvasStore = create<CanvasState>((set, get) => ({
-  nodes: [],
-  edges: [],
-  selectedNode: null,
+export const useCanvasStore = create<CanvasState>()(
+  persist(
+    (set, get) => ({
+      nodes: [],
+      edges: [],
+      selectedNode: null,
 
-  onNodesChange: (changes: NodeChange[]) => {
-    set({
-      nodes: applyNodeChanges(changes, get().nodes),
-    });
-  },
+      onNodesChange: (changes: NodeChange[]) => {
+        set({
+          nodes: applyNodeChanges(changes, get().nodes),
+        });
+      },
 
-  onEdgesChange: (changes: EdgeChange[]) => {
-    set({
-      edges: applyEdgeChanges(changes, get().edges),
-    });
-  },
+      onEdgesChange: (changes: EdgeChange[]) => {
+        set({
+          edges: applyEdgeChanges(changes, get().edges),
+        });
+      },
 
-  onConnect: (connection: Connection) => {
-    set({
-      edges: addEdge(connection, get().edges),
-    });
-  },
+      onConnect: (connection: Connection) => {
+        set({
+          edges: addEdge(connection, get().edges),
+        });
+      },
 
-  setNodes: (nodes) => set({ nodes }),
-  setEdges: (edges) => set({ edges }),
-  setSelectedNode: (node: Node | null) => set({ selectedNode: node }),
+      setNodes: (nodes) => set({ nodes }),
+      setEdges: (edges) => set({ edges }),
+      setSelectedNode: (node: Node | null) => set({ selectedNode: node }),
 
-  updateNodeData: (nodeId, data) => {
-    set({
-      nodes: get().nodes.map((node) => {
-        if (node.id === nodeId) {
-          return { ...node, data: { ...node.data, ...data } };
-        }
-        return node;
-      }),
-    });
-  },
-}));
+      updateNodeData: (nodeId, data) => {
+        set({
+          nodes: get().nodes.map((node) => {
+            if (node.id === nodeId) {
+              return { ...node, data: { ...node.data, ...data } };
+            }
+            return node;
+          }),
+        });
+      },
+
+      clearDraft: () => set({ nodes: [], edges: [], selectedNode: null }),
+    }),
+    {
+      name: 'drawdb-canvas-storage',
+    }
+  )
+);

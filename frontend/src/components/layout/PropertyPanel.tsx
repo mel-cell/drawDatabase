@@ -43,13 +43,30 @@ export default function PropertyPanel() {
     );
   }
 
-  const handleUpdate = () => {
-    updateNodeData(selectedNode.id, {
+  // Auto-update Canvas when tableName or columns change locally
+  useEffect(() => {
+    if (selectedNode) {
+      updateNodeData(selectedNode.id, {
         ...selectedNode.data,
         name: tableName,
         columns: columns
-    });
-  };
+      });
+    }
+  }, [tableName, columns, selectedNode?.id, updateNodeData]);
+
+  if (!selectedNode) {
+    return (
+      <aside className="w-[350px] border-l border-slate-200 bg-white hidden lg:flex flex-col items-center justify-center p-12 text-center">
+         <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 text-slate-300">
+            <Settings className="w-8 h-8" />
+         </div>
+         <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest">Property Panel</h3>
+         <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+            Select a table on the canvas to edit its properties, columns, ddan relations.
+         </p>
+      </aside>
+    );
+  }
 
   const addColumn = () => {
     setColumns([...columns, { name: 'new_column', type: 'VARCHAR(255)', is_pk: false }]);
@@ -125,7 +142,6 @@ export default function PropertyPanel() {
               <div className="max-h-[500px] overflow-y-auto custom-scrollbar bg-white">
                 {columns.map((col, idx) => (
                   <div key={idx} className="group flex items-center gap-2 px-3 py-1.5 border-b border-slate-50 last:border-none hover:bg-blue-50/30 transition-all">
-                      {/* PK Toggle */}
                       <button 
                           onClick={() => updateColumn(idx, 'is_pk', !col.is_pk)}
                           className={cn(
@@ -136,7 +152,6 @@ export default function PropertyPanel() {
                           <Key className={cn("w-3.5 h-3.5", col.is_pk && "fill-amber-500")} />
                       </button>
 
-                      {/* Name Input */}
                       <input 
                           type="text"
                           value={col.name}
@@ -145,7 +160,6 @@ export default function PropertyPanel() {
                           placeholder="column_name"
                       />
 
-                      {/* Type Select */}
                       <select 
                           value={col.type.toUpperCase()}
                           onChange={(e) => updateColumn(idx, 'type', e.target.value)}
@@ -161,7 +175,6 @@ export default function PropertyPanel() {
                           <option value="DECIMAL">DECIMAL</option>
                       </select>
 
-                      {/* Actions */}
                       <button 
                           onClick={() => removeColumn(idx)}
                           className="w-6 opacity-0 group-hover:opacity-100 flex justify-center text-slate-300 hover:text-red-500 transition-all"
@@ -176,17 +189,14 @@ export default function PropertyPanel() {
         </div>
       </div>
 
-      {/* Footer / Save Button */}
-      <div className="p-4 border-t border-slate-200 bg-slate-50/50">
-        <button 
-          onClick={handleUpdate}
-          className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-200 transition-all active:scale-[0.98]"
-        >
-          <Save className="w-4 h-4" />
-          Update Draft
-        </button>
-        <p className="text-[9px] text-center text-slate-400 mt-2.5 font-medium italic">
-            Changes will be applied to the canvas only.
+      {/* Footer Info */}
+      <div className="p-4 border-t border-slate-200 bg-emerald-50/30">
+        <div className="flex items-center gap-2 text-emerald-600 mb-1">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-[10px] font-black uppercase tracking-widest">Draft Mode Active</span>
+        </div>
+        <p className="text-[9px] text-slate-400 font-medium italic">
+            Your changes are auto-saved to the canvas draft. Use the "Push to DB" button to apply to the actual database.
         </p>
       </div>
     </aside>

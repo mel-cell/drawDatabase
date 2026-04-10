@@ -1,6 +1,6 @@
 'use client';
 
-import { Database as DatabaseIcon, Layers, Table as TableIcon, Terminal, Save, Settings, Download, Upload, User, Loader2 } from 'lucide-react';
+import { Database as DatabaseIcon, Layers, Table as TableIcon, Terminal, Save, Settings, Download, Upload, User, Loader2, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSchemaStore } from '@/store/useSchemaStore';
 
