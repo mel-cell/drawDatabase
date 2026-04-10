@@ -17,6 +17,7 @@ interface SchemaState {
   fetchTables: (db: string) => Promise<void>;
   dropDatabase: (db: string) => Promise<boolean>;
   createDatabase: (db: string) => Promise<boolean>;
+  executeQuery: (sql: string) => Promise<{ success: boolean; message?: string; error?: string }>;
 }
 
 const API_URL = '/api';
@@ -104,6 +105,24 @@ export const useSchemaStore = create<SchemaState>((set) => ({
     } catch (error) {
       console.error('Error creating database:', error);
       return false;
+    }
+  },
+
+  executeQuery: async (sql) => {
+    try {
+      const res = await fetch(`${API_URL}/databases/query`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: sql })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        return { success: true, message: data.message };
+      }
+      return { success: false, error: data.error };
+    } catch (error: any) {
+      console.error('Error executing query:', error);
+      return { success: false, error: error.message };
     }
   }
 }));

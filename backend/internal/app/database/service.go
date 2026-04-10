@@ -24,3 +24,7 @@ func (s *databaseService) Create(ctx context.Context, name string) error {
 func (s *databaseService) Drop(ctx context.Context, name string) error {
 	return s.repo.DropDatabase(ctx, name)
 }
+
+func (s *databaseService) Execute(ctx context.Context, query string) error {
+	return s.repo.ExecuteDDL(ctx, query)
+}

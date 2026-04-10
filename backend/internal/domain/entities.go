@@ -77,6 +77,7 @@ type SchemaRepository interface {
 	DeleteData(ctx context.Context, tableName string, condition map[string]interface{}) error
 
 	ExecuteRaw(ctx context.Context, query string) ([]map[string]interface{}, error)
+    ExecuteDDL(ctx context.Context, query string) error
     
     // Layout
     SaveLayout(ctx context.Context, layouts map[string]interface{}) error
@@ -98,6 +99,7 @@ type DatabaseService interface {
 	List(ctx context.Context) ([]string, error)
 	Create(ctx context.Context, name string) error
 	Drop(ctx context.Context, name string) error
+	Execute(ctx context.Context, query string) error
 }
 
 type DataService interface {

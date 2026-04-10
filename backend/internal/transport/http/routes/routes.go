@@ -32,6 +32,7 @@ func SetupRoutes(
 	api.Get("/databases", dbH.List)
 	api.Post("/databases", dbH.Create)
 	api.Delete("/databases", dbH.Drop)
+	api.Post("/databases/query", dbH.ExecuteQuery)
 
 	// Data Browser
 	api.Get("/data", dataH.GetData)

@@ -134,36 +134,41 @@ export default function PropertyPanel() {
 
             <div className="space-y-1 border border-slate-100 rounded-xl overflow-hidden">
               <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 border-b border-slate-100 text-[9px] font-black text-slate-400">
-                  <div className="w-8">PK</div>
+                  <div className="w-6">PK</div>
                   <div className="flex-1">COLUMN NAME</div>
-                  <div className="w-32">TYPE</div>
+                  <div className="w-24">TYPE</div>
+                  <div className="w-6">NULL</div>
+                  <div className="w-6">AI</div>
                   <div className="w-6"></div>
               </div>
               <div className="max-h-[500px] overflow-y-auto custom-scrollbar bg-white">
                 {columns.map((col, idx) => (
                   <div key={idx} className="group flex items-center gap-2 px-3 py-1.5 border-b border-slate-50 last:border-none hover:bg-blue-50/30 transition-all">
+                      {/* PK Toggle */}
                       <button 
                           onClick={() => updateColumn(idx, 'is_pk', !col.is_pk)}
                           className={cn(
-                              "w-8 flex justify-center transition-all",
+                              "w-6 flex justify-center transition-all",
                               col.is_pk ? "text-amber-500" : "text-slate-200 hover:text-slate-400"
                           )}
                       >
-                          <Key className={cn("w-3.5 h-3.5", col.is_pk && "fill-amber-500")} />
+                          <Key className={cn("w-3 h-3", col.is_pk && "fill-amber-500")} />
                       </button>
 
+                      {/* Name Input */}
                       <input 
                           type="text"
                           value={col.name}
                           onChange={(e) => updateColumn(idx, 'name', e.target.value)}
-                          className="flex-1 bg-transparent border-none text-[12px] font-bold text-slate-700 focus:ring-0 p-0 outline-none truncate placeholder:font-normal"
+                          className="flex-1 bg-transparent border-none text-[11px] font-bold text-slate-700 focus:ring-0 p-0 outline-none truncate placeholder:font-normal"
                           placeholder="column_name"
                       />
 
+                      {/* Type Select */}
                       <select 
                           value={col.type.toUpperCase()}
                           onChange={(e) => updateColumn(idx, 'type', e.target.value)}
-                          className="w-32 bg-transparent border-none text-[10px] font-bold text-slate-500 p-0 focus:ring-0 outline-none cursor-pointer"
+                          className="w-24 bg-transparent border-none text-[10px] font-bold text-slate-500 p-0 focus:ring-0 outline-none cursor-pointer"
                       >
                           <option value="INT">INT</option>
                           <option value="BIGINT">BIGINT</option>
@@ -175,11 +180,28 @@ export default function PropertyPanel() {
                           <option value="DECIMAL">DECIMAL</option>
                       </select>
 
+                      {/* Nullable Toggle */}
+                      <input 
+                        type="checkbox"
+                        checked={col.nullable}
+                        onChange={(e) => updateColumn(idx, 'nullable', e.target.checked)}
+                        className="w-3 h-3 rounded border-slate-300 text-blue-600 focus:ring-0"
+                      />
+
+                      {/* AI Toggle */}
+                      <input 
+                        type="checkbox"
+                        checked={col.is_ai}
+                        onChange={(e) => updateColumn(idx, 'is_ai', e.target.checked)}
+                        className="w-3 h-3 rounded border-slate-300 text-emerald-600 focus:ring-0"
+                      />
+
+                      {/* Actions */}
                       <button 
                           onClick={() => removeColumn(idx)}
                           className="w-6 opacity-0 group-hover:opacity-100 flex justify-center text-slate-300 hover:text-red-500 transition-all"
                       >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash2 className="w-3 h-3" />
                       </button>
                   </div>
                 ))}

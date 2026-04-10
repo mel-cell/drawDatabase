@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useCallback } from 'react';
+import { useEffect, useMemo, useCallback, useState } from 'react';
 import { 
   ReactFlow, 
   Background, 
@@ -16,7 +16,10 @@ import '@xyflow/react/dist/style.css';
 
 import { useSchemaStore } from '@/store/useSchemaStore';
 import { useCanvasStore } from '@/store/useCanvasStore';
+import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 import TableNode from './TableNode';
+import { generateSQL } from '@/lib/sqlGenerator';
 import { 
   Zap,
   RefreshCw, 
@@ -30,7 +33,8 @@ import {
   BoxSelect,
   Code,
   Wand2,
-  Search
+  Search,
+  X
 } from 'lucide-react';
 
 const nodeTypes = {
@@ -47,8 +51,12 @@ export default function ERDCanvas() {
     onConnect,
     setNodes,
     setEdges,
-    setSelectedNode
+    setSelectedNode,
+    dbContext,
+    setDbContext
   } = useCanvasStore();
+
+  const [isSqlModalOpen, setIsSqlModalOpen] = useState(false);
 
   const addTable = () => {
     const id = `table_${Date.now()}`;
@@ -65,55 +73,61 @@ export default function ERDCanvas() {
     setSelectedNode(newNode);
   };
 
-  // Sync tables to nodes ONLY IF canvas is empty (initial load)
+  // Sync tables to nodes ONLY IF database changed or canvas is empty
   useEffect(() => {
-    // Jika sudah ada node (draft), jangan ditimpa otomatis
-    if (nodes.length > 0) return;
-    
-    if (!tables.length) {
+    // Jika tidak ada DB yang dipilih, bersihkan canvas
+    if (!currentDatabase) {
       setNodes([]);
       setEdges([]);
+      setDbContext(null);
       return;
     }
 
-    const COLUMNS = 4;
-    const SPACING_X = 350;
-    const SPACING_Y = 450;
+    // Jika DB berubah, kita HARUS sync ulang (overwrite draft lama dari DB berbeda)
+    if (currentDatabase !== dbContext || nodes.length === 0) {
+      if (!tables.length && !isTablesLoading) {
+        setNodes([]);
+        setEdges([]);
+        setDbContext(currentDatabase);
+        return;
+      }
 
-    // Create Nodes in a clean grid
-    const initialNodes: Node[] = tables.map((table, index) => ({
-      id: table.name,
-      type: 'table',
-      position: { 
-        x: (index % COLUMNS) * SPACING_X, 
-        y: Math.floor(index / COLUMNS) * SPACING_Y 
-      },
-      data: { name: table.name, columns: table.columns },
-    }));
+      if (tables.length > 0) {
+        const COLUMNS = 4;
+        const SPACING_X = 350;
+        const SPACING_Y = 450;
 
-    // Create Edges with clear labels ddan SOLID orthogonal (kaku) lines
-    const initialEdges: Edge[] = relations.map((rel, index) => ({
-      id: `e-${rel.source_table}-${rel.target_table}-${index}`,
-      type: 'smoothstep', // INI BIAR KAKU (SIKU-SIKU)
-      source: rel.source_table,
-      target: rel.target_table,
-      sourceHandle: `${rel.source_table}-${rel.source_column}-right`,
-      targetHandle: `${rel.target_table}-${rel.target_column}-left`,
-      label: `${rel.source_column} → ${rel.target_column}`, 
-      labelStyle: { fill: '#64748b', fontWeight: 700, fontSize: 10 },
-      labelBgStyle: { fill: '#ffffff', fillOpacity: 0.9, rx: 4 },
-      style: { stroke: '#3b82f6', strokeWidth: 2, opacity: 0.8 },
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        color: '#3b82f6',
-        width: 15,
-        height: 15,
-      },
-    }));
+        const initialNodes: Node[] = tables.map((table, index) => ({
+          id: table.name,
+          type: 'table',
+          position: { 
+            x: (index % COLUMNS) * SPACING_X, 
+            y: Math.floor(index / COLUMNS) * SPACING_Y 
+          },
+          data: { name: table.name, columns: table.columns },
+        }));
 
-    setNodes(initialNodes);
-    setEdges(initialEdges);
-  }, [tables, relations, setNodes, setEdges]);
+        const initialEdges: Edge[] = relations.map((rel, index) => ({
+          id: `e-${rel.source_table}-${rel.target_table}-${index}`,
+          type: 'smoothstep',
+          source: rel.source_table,
+          target: rel.target_table,
+          sourceHandle: `${rel.source_table}-${rel.source_column}-right`,
+          targetHandle: `${rel.target_table}-${rel.target_column}-left`,
+          label: `${rel.source_column} → ${rel.target_column}`,
+          labelStyle: { fill: '#64748b', fontWeight: 700, fontSize: 10 },
+          labelBgStyle: { fill: '#ffffff', fillOpacity: 0.9, rx: 4 },
+          style: { stroke: '#3b82f6', strokeWidth: 2 },
+          markerEnd: { type: MarkerType.ArrowClosed, color: '#3b82f6', width: 15, height: 15 },
+          data: { sourceColumn: rel.source_column, targetColumn: rel.target_column }
+        }));
+
+        setNodes(initialNodes);
+        setEdges(initialEdges);
+        setDbContext(currentDatabase);
+      }
+    }
+  }, [tables, relations, currentDatabase, dbContext, setNodes, setEdges, setDbContext, isTablesLoading]);
 
   const resetLayout = useCallback(() => {
     const COLUMNS = 4;
@@ -242,7 +256,11 @@ export default function ERDCanvas() {
 
             {/* Action Group */}
             <div className="bg-white border border-slate-200 p-1.5 rounded-2xl shadow-2xl flex flex-col gap-1.5 animate-in slide-in-from-left duration-500 delay-300">
-                <button className="p-3 bg-white text-slate-500 rounded-xl hover:bg-slate-50 hover:text-blue-600 transition-all group relative" title="Preview SQL">
+                <button 
+                  onClick={() => setIsSqlModalOpen(true)}
+                  className="p-3 bg-white text-slate-500 rounded-xl hover:bg-slate-50 hover:text-blue-600 transition-all group relative" 
+                  title="Preview SQL"
+                >
                     <Code className="w-5 h-5" />
                     <span className="absolute left-full ml-3 px-2 py-1 bg-slate-800 text-white text-[10px] font-bold rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-[1001]">
                          PREVIEW SQL (S)
@@ -251,7 +269,26 @@ export default function ERDCanvas() {
 
                 <div className="h-px bg-slate-100 mx-2" />
 
-                <button className="p-3 bg-emerald-600 text-white rounded-xl shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all hover:scale-110 active:scale-95 group relative" title="Push to Database">
+                <button 
+                  onClick={async () => {
+                    const sql = generateSQL(nodes, edges);
+                    const id = toast.loading('Pushing changes to database...');
+                    
+                    const res = await useSchemaStore.getState().executeQuery(sql);
+                    
+                    if (res.success) {
+                      toast.success('Database updated successfully!', { id });
+                      // Ambil schema terbaru biar seger
+                      if (currentDatabase) {
+                        useSchemaStore.getState().fetchTables(currentDatabase);
+                      }
+                    } else {
+                      toast.error(`Push failed: ${res.error}`, { id });
+                    }
+                  }}
+                  className="p-3 bg-emerald-600 text-white rounded-xl shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition-all hover:scale-110 active:scale-95 group relative" 
+                  title="Push to Database"
+                >
                     <Zap className="w-5 h-5 fill-emerald-400 group-hover:animate-pulse" />
                     <span className="absolute left-full ml-3 px-2 py-1 bg-slate-800 text-white text-[10px] font-bold rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-[1001]">
                          PUSH TO DB (P)
@@ -269,6 +306,19 @@ export default function ERDCanvas() {
         <Panel position="top-right" className="flex gap-2">
             <div className="bg-white/80 backdrop-blur-md border border-slate-200 p-2 rounded-xl shadow-xl flex items-center gap-2">
                 <button 
+                    onClick={() => {
+                        // Paksa sync ulang dari DB
+                        useSchemaStore.getState().fetchTables(currentDatabase!);
+                        setDbContext(null); // Trigger useEffect sync
+                        toast.success('Syncing schema from database...');
+                    }}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200 active:scale-95 transition-all"
+                    title="Refresh Schema from DB"
+                >
+                    <RefreshCw className={cn("w-3.5 h-3.5", isTablesLoading && "animate-spin")} />
+                </button>
+                <div className="h-4 w-px bg-slate-200 mx-1"></div>
+                <button 
                     onClick={resetLayout}
                     className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold shadow-lg shadow-blue-100 cursor-pointer hover:bg-blue-700 active:scale-95 transition-all"
                 >
@@ -282,6 +332,52 @@ export default function ERDCanvas() {
             </div>
         </Panel>
       </ReactFlow>
+
+      {/* SQL PREVIEW MODAL */}
+      {isSqlModalOpen && (
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
+           <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-300">
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-blue-600 rounded-xl shadow-lg shadow-blue-100 text-white">
+                    <Code className="w-4 h-4" />
+                  </div>
+                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">SQL Preview (MySQL)</h3>
+                </div>
+                <button 
+                  onClick={() => setIsSqlModalOpen(false)}
+                  className="p-2 hover:bg-slate-200 rounded-lg transition-all text-slate-400"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-auto p-0 bg-slate-900 font-mono text-sm leading-relaxed p-6 text-emerald-400">
+                <pre className="whitespace-pre-wrap selection:bg-emerald-400/20">
+                  {generateSQL(nodes, edges)}
+                </pre>
+              </div>
+
+              <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                 <button 
+                   onClick={() => setIsSqlModalOpen(false)}
+                   className="px-6 py-2.5 text-xs font-bold text-slate-500 hover:text-slate-700 transition-all uppercase tracking-widest"
+                 >
+                   Close
+                 </button>
+                 <button 
+                   onClick={() => {
+                     navigator.clipboard.writeText(generateSQL(nodes, edges));
+                     // Could add a toast notification here
+                   }}
+                   className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black shadow-lg shadow-blue-100 transition-all active:scale-95"
+                 >
+                   COPY TO CLIPBOARD
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
     </div>
   );
 }

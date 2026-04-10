@@ -310,6 +310,15 @@ func (r *mysqlRepository) ExecuteRaw(ctx context.Context, query string) ([]map[s
     return results, nil
 }
 
+func (r *mysqlRepository) ExecuteDDL(ctx context.Context, query string) error {
+    db, err := r.getDB()
+	if err != nil {
+        return err
+    }
+    // Pakai Exec untuk DDL karena tidak mengembalikan baris
+    return db.WithContext(ctx).Exec(query).Error
+}
+
 func (r *mysqlRepository) SaveLayout(ctx context.Context, layouts map[string]interface{}) error {
     db, err := r.getDB()
 	if err != nil {

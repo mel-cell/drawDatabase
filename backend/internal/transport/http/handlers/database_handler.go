@@ -40,3 +40,17 @@ func (h *DatabaseHandler) Drop(c *fiber.Ctx) error {
 	}
 	return c.JSON(fiber.Map{"message": "database dropped"})
 }
+
+func (h *DatabaseHandler) ExecuteQuery(c *fiber.Ctx) error {
+	type Req struct { Query string `json:"query"` }
+	var req Req
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "invalid json"})
+	}
+
+	if err := h.service.Execute(context.Background(), req.Query); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(fiber.Map{"message": "query executed successfully"})
+}
