@@ -35,8 +35,9 @@ export default function Sidebar() {
   const [search, setSearch] = useState('');
   
   // Context Menu State
-  const [menuPos, setMenuPos] = useState<{ x: number, y: number } | null>(null);
-  const [menuTarget, setMenuTarget] = useState<string | null>(null);
+  const [dbMenu, setDbMenu] = useState<{ x: number, y: number, name: string } | null>(null);
+  const [tableMenu, setTableMenu] = useState<{ x: number, y: number, name: string } | null>(null);
+  const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     // Jika tidak ada koneksi aktif, jangan lakukan apa-apa
@@ -57,30 +58,40 @@ export default function Sidebar() {
     initSidebar();
   }, [activeConnection, fetchDatabases, applyConnection]);
 
-  const handleContextMenu = (e: React.MouseEvent, db: string) => {
+  const handleDbContextMenu = (e: React.MouseEvent, db: string) => {
     e.preventDefault();
-    setMenuPos({ x: e.clientX, y: e.clientY });
-    setMenuTarget(db);
+    setDbMenu({ x: e.clientX, y: e.clientY, name: db });
+    setTableMenu(null);
   };
 
-  const closeMenu = () => {
-    setMenuPos(null);
-    setMenuTarget(null);
+  const handleTableContextMenu = (e: React.MouseEvent, table: string) => {
+    e.preventDefault();
+    setTableMenu({ x: e.clientX, y: e.clientY, name: table });
+    setDbMenu(null);
+  };
+
+  const closeMenus = () => {
+    setDbMenu(null);
+    setTableMenu(null);
   };
 
   useEffect(() => {
-    const handleClick = () => closeMenu();
-    window.addEventListener('click', handleClick);
-    return () => window.removeEventListener('click', handleClick);
+    window.addEventListener('click', closeMenus);
+    return () => window.removeEventListener('click', closeMenus);
   }, []);
 
-  const handleDrop = async (db: string) => {
-    if (confirm(`Are you sure you want to drop database "${db}"? This action is IRREVERSIBLE.`)) {
+  const toggleTable = (tableName: string) => {
+    const next = new Set(expandedTables);
+    if (next.has(tableName)) next.delete(tableName);
+    else next.add(tableName);
+    setExpandedTables(next);
+  };
+
+  const handleDropDb = async (db: string) => {
+    if (confirm(`Are you sure you want to drop database "${db}"?`)) {
       const ok = await dropDatabase(db);
       if (ok) toast.success(`Database "${db}" dropped`);
-      else toast.error(`Failed to drop database "${db}"`);
     }
-    closeMenu();
   };
 
   const filteredDatabases = databases.filter(db => 
@@ -133,9 +144,9 @@ export default function Sidebar() {
             <div key={db} className="group relative">
               <button
                 onClick={() => setCurrentDatabase(currentDatabase === db ? null : db)}
-                onContextMenu={(e) => handleContextMenu(e, db)}
+                onContextMenu={(e) => handleDbContextMenu(e, db)}
                 className={cn(
-                  "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all group-context-menu:bg-blue-50",
+                  "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all",
                   currentDatabase === db 
                     ? "bg-blue-600 text-white shadow-md shadow-blue-100 font-medium" 
                     : "text-gray-600 hover:bg-white hover:shadow-sm"
@@ -143,7 +154,7 @@ export default function Sidebar() {
               >
                 <div className="shrink-0">
                   {currentDatabase === db ? (
-                    <ChevronDown className={cn("w-3.5 h-3.5", currentDatabase === db ? "text-blue-100" : "text-gray-400")} />
+                    <ChevronDown className="w-3.5 h-3.5 text-blue-100" />
                   ) : (
                     <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
                   )}
@@ -156,13 +167,13 @@ export default function Sidebar() {
                     "w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity",
                     currentDatabase === db ? "text-blue-200" : "text-gray-300"
                   )} 
-                  onClick={(e) => { e.stopPropagation(); handleContextMenu(e as any, db); }}
+                  onClick={(e) => { e.stopPropagation(); handleDbContextMenu(e as any, db); }}
                 />
               </button>
 
               {/* Nested Table List */}
               {currentDatabase === db && (
-                <div className="ml-6 mt-1 mb-2 space-y-0.5 border-l-2 border-blue-500/10 pl-3 py-1 ring-inset transition-all animate-in slide-in-from-left-2 duration-200">
+                <div className="ml-6 mt-1 mb-2 space-y-0.5 border-l-2 border-blue-500/10 pl-3 py-1 animate-in slide-in-from-left-2 duration-200">
                    <div className="flex items-center justify-between pr-2 mb-1">
                       <span className="text-[9px] font-black text-blue-300 uppercase tracking-widest">Tables</span>
                       {isTablesLoading && <RefreshCw className="w-2.5 h-2.5 animate-spin text-blue-300" />}
@@ -172,13 +183,37 @@ export default function Sidebar() {
                      <p className="text-[10px] text-gray-400 italic py-2 pl-2">No tables found</p>
                    ) : (
                      tables.map((table: any) => (
-                       <button 
-                         key={table.name}
-                         className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-xs text-gray-500 hover:bg-white hover:text-blue-600 hover:shadow-sm transition-all"
-                       >
-                         <TableIcon className="w-3.5 h-3.5 text-gray-300 group-hover:text-blue-400" />
-                         <span className="truncate">{table.name}</span>
-                       </button>
+                       <div key={table.name} className="space-y-0.5">
+                        <button 
+                          onClick={() => toggleTable(table.name)}
+                          onContextMenu={(e) => handleTableContextMenu(e, table.name)}
+                          className={cn(
+                            "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-all group/table",
+                            expandedTables.has(table.name) ? "text-blue-600 bg-blue-50 font-medium" : "text-gray-500 hover:bg-white hover:text-blue-600"
+                          )}
+                        >
+                          {expandedTables.has(table.name) ? (
+                            <ChevronDown className="w-3 h-3 text-blue-400" />
+                          ) : (
+                            <ChevronRight className="w-3 h-3 text-gray-300" />
+                          )}
+                          <TableIcon className={cn("w-3.5 h-3.5", expandedTables.has(table.name) ? "text-blue-500" : "text-gray-300")} />
+                          <span className="truncate overflow-hidden">{table.name}</span>
+                        </button>
+
+                        {/* Columns List (Sub-nested) */}
+                        {expandedTables.has(table.name) && table.columns && (
+                            <div className="ml-4 pl-3 border-l border-blue-100 py-1 space-y-1 animate-in slide-in-from-top-1 duration-150">
+                                {table.columns.map((col: any) => (
+                                    <div key={col.name} className="flex items-center gap-2 text-[10px] text-gray-400 group/col relative">
+                                        <div className={cn("w-1 h-1 rounded-full", col.is_pk ? "bg-amber-400" : "bg-gray-200")}></div>
+                                        <span className={cn(col.is_pk && "text-gray-600 font-bold")}>{col.name}</span>
+                                        <span className="text-[8px] opacity-40 font-mono">{col.type}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                       </div>
                      ))
                    )}
                 </div>
@@ -188,28 +223,59 @@ export default function Sidebar() {
         </div>
       </ScrollArea>
 
-      {/* CUSTOM CONTEXT MENU */}
-      {menuPos && (
+      {/* DB CONTEXT MENU */}
+      {dbMenu && (
         <div 
           className="fixed z-[1000] w-48 bg-white border border-gray-200 shadow-xl rounded-xl py-1 animate-in zoom-in-95 duration-100"
-          style={{ top: menuPos.y, left: menuPos.x }}
+          style={{ top: dbMenu.y, left: dbMenu.x }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="px-3 py-2 border-b border-gray-50">
-            <p className="text-[10px] uppercase font-bold text-gray-400 tracking-tighter truncate">{menuTarget}</p>
+          <div className="px-3 py-2 border-b border-gray-50 bg-gray-50/50 rounded-t-xl">
+            <p className="text-[10px] uppercase font-bold text-gray-400 tracking-tighter truncate">{dbMenu.name}</p>
           </div>
-          <button className="w-full text-left px-3 py-2 text-xs text-gray-600 hover:bg-gray-50 flex items-center gap-2">
+          <button className="w-full text-left px-3 py-2 text-xs text-gray-600 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2 transition-colors">
             <RefreshCw className="w-3 h-3" /> Refresh Schema
           </button>
-          <button className="w-full text-left px-3 py-2 text-xs text-gray-600 hover:bg-gray-50 flex items-center gap-2">
-            <Terminal className="w-3 h-3" /> New SQL Query
+          <button className="w-full text-left px-3 py-2 text-xs text-gray-600 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2 transition-colors">
+            <Plus className="w-3 h-3" /> New Table
+          </button>
+          <button className="w-full text-left px-3 py-2 text-xs text-gray-600 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2 transition-colors">
+            <Terminal className="w-3 h-3" /> SQL Console
           </button>
           <div className="h-px bg-gray-100 my-1"></div>
           <button 
-            onClick={() => menuTarget && handleDrop(menuTarget)}
-            className="w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50 flex items-center gap-2"
+            onClick={() => handleDropDb(dbMenu.name)}
+            className="w-full text-left px-3 py-2 text-xs text-red-610 hover:bg-red-50 flex items-center gap-2 transition-colors"
           >
             <Trash2 className="w-3 h-3" /> Drop Database
+          </button>
+        </div>
+      )}
+
+      {/* TABLE CONTEXT MENU */}
+      {tableMenu && (
+        <div 
+          className="fixed z-[1000] w-48 bg-white border border-gray-200 shadow-xl rounded-xl py-1 animate-in zoom-in-95 duration-100"
+          style={{ top: tableMenu.y, left: tableMenu.x }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-3 py-2 border-b border-gray-50 bg-gray-50/50 rounded-t-xl">
+            <p className="text-[10px] uppercase font-bold text-gray-400 tracking-tighter truncate">{tableMenu.name}</p>
+          </div>
+          <button className="w-full text-left px-3 py-2 text-xs text-gray-600 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2 transition-colors">
+            <Search className="w-3 h-3" /> View Data
+          </button>
+          <button className="w-full text-left px-3 py-2 text-xs text-gray-600 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2 transition-colors">
+            <RefreshCw className="w-3 h-3" /> Sync to Canvas
+          </button>
+          <button className="w-full text-left px-3 py-2 text-xs text-gray-600 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2 transition-colors">
+            <Plus className="w-3 h-3" /> Add Column
+          </button>
+          <div className="h-px bg-gray-100 my-1"></div>
+          <button 
+            className="w-full text-left px-3 py-2 text-xs text-red-610 hover:bg-red-50 flex items-center gap-2 transition-colors"
+          >
+            <Trash2 className="w-3 h-3" /> Drop Table
           </button>
         </div>
       )}
