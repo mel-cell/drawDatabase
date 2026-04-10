@@ -29,9 +29,17 @@ func (r *mysqlRepository) SetDB(db *gorm.DB) {
 func (r *mysqlRepository) getDB() (*gorm.DB, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
+    
+    // Cek apakah pointer nil ATAU DB-nya punya error internal (broken connection)
 	if r.db == nil {
 		return nil, fmt.Errorf("database connection not established. please configure connection in settings")
 	}
+    
+    // GORM kadang mengembalikan objek DB yang punya Error di dalamnya jika gagal konek
+    if r.db.Error != nil {
+        return nil, fmt.Errorf("database connection is broken: %v. please re-connect", r.db.Error)
+    }
+
 	return r.db, nil
 }
 

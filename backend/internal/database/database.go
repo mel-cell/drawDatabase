@@ -14,6 +14,7 @@ func Connect(dsn string) {
 	DB, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
 		log.Printf("Warning: Failed to connect to database: %v", err)
+        DB = nil // PENTING: Paksa nil supaya repo tahu kalau ini gagal
 	} else {
 		log.Println("Database connected successfully")
 	}

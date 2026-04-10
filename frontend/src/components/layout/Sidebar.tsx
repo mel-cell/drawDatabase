@@ -39,11 +39,17 @@ export default function Sidebar() {
   const [menuTarget, setMenuTarget] = useState<string | null>(null);
 
   useEffect(() => {
+    // Jika tidak ada koneksi aktif, jangan lakukan apa-apa
+    if (!activeConnection) {
+      return;
+    }
+
     const initSidebar = async () => {
-      if (activeConnection) {
-        // 1. Pastikan backend sinkron dengan koneksi aktif kita (Auto-Apply)
-        await applyConnection(activeConnection);
-        // 2. Baru tarik database-nya
+      // 1. Pastikan backend sinkron dengan koneksi aktif kita (Auto-Apply)
+      const ok = await applyConnection(activeConnection);
+      
+      // 2. Jika sukses apply (backend sudah konek), baru tarik database-nya
+      if (ok) {
         await fetchDatabases();
       }
     };

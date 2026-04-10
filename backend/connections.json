@@ -1,3 +1,9 @@
 [
- 
+  {
+    "name": "Local MySQL",
+    "host": "localhost",
+    "port": 3306,
+    "user": "mel",
+    "password": "root"
+  }
 ]
