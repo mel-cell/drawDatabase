@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useSchemaStore } from '@/store/useSchemaStore';
 import { useConnectionStore } from '@/store/useConnectionStore';
 import { toast } from 'sonner';
@@ -17,7 +17,6 @@ import {
   Terminal,
   MoreVertical
 } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 
 export default function Sidebar() {
@@ -244,9 +243,6 @@ export default function Sidebar() {
         </div>
         <SettingsBtn />
       </div>
-    </aside>
-  );
-}
 
       {/* DB CONTEXT MENU */}
       {dbMenu && (
@@ -304,19 +300,6 @@ export default function Sidebar() {
           </button>
         </div>
       )}
-
-      {/* Connection Info Footer */}
-      <div className="p-4 bg-white border-t border-gray-200 flex items-center gap-3">
-        <div className="relative">
-          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
-          <div className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping opacity-30"></div>
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-bold text-gray-300 uppercase tracking-tight truncate leading-none mb-1">MySQL Connected</p>
-          <p className="text-xs font-bold text-gray-700 truncate tracking-tight">{activeConnection?.name || 'Local MySQL'}</p>
-        </div>
-        <SettingsBtn />
-      </div>
     </aside>
   );
 }
