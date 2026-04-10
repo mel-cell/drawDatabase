@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useSchemaStore } from '@/store/useSchemaStore';
 import { useConnectionStore } from '@/store/useConnectionStore';
 import { toast } from 'sonner';
+import CreateDatabaseModal from '@/components/modals/CreateDatabaseModal';
 import { 
   Database, 
   ChevronRight, 
@@ -34,6 +35,7 @@ export default function Sidebar() {
   const { activeConnection, applyConnection } = useConnectionStore();
   const [search, setSearch] = useState('');
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCreateDbModalOpen, setIsCreateDbModalOpen] = useState(false);
   
   // Context Menu State
   const [dbMenu, setDbMenu] = useState<{ x: number, y: number, name: string } | null>(null);
@@ -106,7 +108,11 @@ export default function Sidebar() {
             >
               <RefreshCw className={cn("w-3.5 h-3.5", isLoading && "animate-spin")} />
             </button>
-            <button className="p-1.5 hover:bg-gray-100 rounded-md text-gray-400 hover:text-blue-600 transition-all" title="Create New Database">
+            <button 
+              onClick={() => setIsCreateDbModalOpen(true)}
+              className="p-1.5 hover:bg-gray-100 rounded-md text-gray-400 hover:text-blue-600 transition-all" 
+              title="Create New Database"
+            >
               <Plus className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -300,6 +306,10 @@ export default function Sidebar() {
           </button>
         </div>
       )}
+      <CreateDatabaseModal 
+        isOpen={isCreateDbModalOpen} 
+        onClose={() => setIsCreateDbModalOpen(false)} 
+      />
     </aside>
   );
 }

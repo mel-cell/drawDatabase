@@ -16,6 +16,7 @@ interface SchemaState {
   setCurrentDatabase: (db: string | null) => void;
   fetchTables: (db: string) => Promise<void>;
   dropDatabase: (db: string) => Promise<boolean>;
+  createDatabase: (db: string) => Promise<boolean>;
 }
 
 const API_URL = '/api';
@@ -70,7 +71,8 @@ export const useSchemaStore = create<SchemaState>((set) => ({
 
   dropDatabase: async (db) => {
     try {
-      const res = await fetch(`${API_URL}/databases?db=${encodeURIComponent(db)}`, {
+      // Sesuai backend: c.Query("name")
+      const res = await fetch(`${API_URL}/databases?name=${encodeURIComponent(db)}`, {
         method: 'DELETE'
       });
       if (res.ok) {
@@ -83,6 +85,24 @@ export const useSchemaStore = create<SchemaState>((set) => ({
       return false;
     } catch (error) {
       console.error('Error dropping database:', error);
+      return false;
+    }
+  },
+
+  createDatabase: async (db) => {
+    try {
+      const res = await fetch(`${API_URL}/databases`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: db })
+      });
+      if (res.ok) {
+        await useSchemaStore.getState().fetchDatabases();
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error creating database:', error);
       return false;
     }
   }

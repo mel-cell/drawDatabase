@@ -10,31 +10,36 @@ import {
   OnNodesChange,
   OnEdgesChange,
   OnConnect,
-  Connection
+  Connection,
+  NodeChange,
+  EdgeChange
 } from '@xyflow/react';
 
 interface CanvasState {
   nodes: Node[];
   edges: Edge[];
+  selectedNode: Node | null;
   onNodesChange: OnNodesChange;
   onEdgesChange: OnEdgesChange;
   onConnect: OnConnect;
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
+  setSelectedNode: (node: Node | null) => void;
   updateNodeData: (nodeId: string, data: any) => void;
 }
 
 export const useCanvasStore = create<CanvasState>((set, get) => ({
   nodes: [],
   edges: [],
+  selectedNode: null,
 
-  onNodesChange: (changes) => {
+  onNodesChange: (changes: NodeChange[]) => {
     set({
       nodes: applyNodeChanges(changes, get().nodes),
     });
   },
 
-  onEdgesChange: (changes) => {
+  onEdgesChange: (changes: EdgeChange[]) => {
     set({
       edges: applyEdgeChanges(changes, get().edges),
     });
@@ -48,6 +53,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   setNodes: (nodes) => set({ nodes }),
   setEdges: (edges) => set({ edges }),
+  setSelectedNode: (node: Node | null) => set({ selectedNode: node }),
 
   updateNodeData: (nodeId, data) => {
     set({

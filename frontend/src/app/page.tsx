@@ -9,6 +9,7 @@ import { useSchemaStore } from '@/store/useSchemaStore';
 import { Database, Plus } from 'lucide-react';
 
 import ERDCanvas from '@/components/canvas/ERDCanvas';
+import PropertyPanel from '@/components/layout/PropertyPanel';
 
 export default function Home() {
   const [activePage, setActivePage] = useState<'diagram' | 'data' | 'sql'>('diagram');
@@ -85,15 +86,8 @@ export default function Home() {
           </div>
         </div>
 
-        {/* 3. Right Property Panel (To be implemented) */}
-        <aside className="w-[300px] border-l border-slate-200 bg-white hidden lg:flex flex-col">
-           <div className="p-4 border-b border-slate-200">
-             <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Properties</h3>
-           </div>
-           <div className="flex-1 flex items-center justify-center p-8 text-center">
-              <p className="text-xs text-slate-300 italic italic">No item selected</p>
-           </div>
-        </aside>
+        {/* 3. Right Property Panel */}
+        <PropertyPanel />
       </div>
 
       {/* Modals */}

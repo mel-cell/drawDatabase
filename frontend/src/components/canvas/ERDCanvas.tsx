@@ -32,7 +32,8 @@ export default function ERDCanvas() {
     onEdgesChange, 
     onConnect,
     setNodes,
-    setEdges 
+    setEdges,
+    setSelectedNode
   } = useCanvasStore();
 
   // Sync tables to nodes with a Clean Grid Layout
@@ -113,6 +114,8 @@ export default function ERDCanvas() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onNodeClick={(_, node) => setSelectedNode(node)}
+        onPaneClick={() => setSelectedNode(null)}
         nodeTypes={nodeTypes}
         fitView
       >
