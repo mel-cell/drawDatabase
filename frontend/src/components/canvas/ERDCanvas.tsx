@@ -274,6 +274,15 @@ export default function ERDCanvas() {
                     const sql = generateSQL(nodes, edges);
                     const id = toast.loading('Pushing changes to database...');
                     
+                    // Simple Validation: Cek apakah ada nama tabel duplikat atau kolom duplikat di Canvas
+                    const tableNames = nodes.map(n => (n.data as any).name.toLowerCase());
+                    const hasDuplicateTables = new Set(tableNames).size !== tableNames.length;
+
+                    if (hasDuplicateTables) {
+                      toast.error('Push failed: Duplicate table names detected!', { id });
+                      return;
+                    }
+
                     const res = await useSchemaStore.getState().executeQuery(sql);
                     
                     if (res.success) {

@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useCanvasStore } from '@/store/useCanvasStore';
+import { z } from 'zod';
+import { toast } from 'sonner';
 import { 
   Settings, 
   Table as TableIcon, 
@@ -20,6 +22,21 @@ export default function PropertyPanel() {
   const { selectedNode, updateNodeData, setSelectedNode } = useCanvasStore();
   const [tableName, setTableName] = useState('');
   const [columns, setColumns] = useState<any[]>([]);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Validation Schemas
+  const columnSchema = z.object({
+    name: z.string().min(1, "Column name is required").regex(/^[a-zA-Z0-9_]+$/, "Invalid characters"),
+    type: z.string()
+  });
+
+  const tableSchema = z.object({
+    name: z.string().min(1, "Table name is required").regex(/^[a-zA-Z0-9_]+$/, "Invalid characters"),
+    columns: z.array(columnSchema).refine((cols) => {
+        const names = cols.map(c => c.name.toLowerCase());
+        return new Set(names).size === names.length;
+    }, { message: "Duplicate column names detected" })
+  });
 
   // Sync state when selectedNode changes
   useEffect(() => {
@@ -29,15 +46,29 @@ export default function PropertyPanel() {
     }
   }, [selectedNode]);
 
-  // Auto-update Canvas when tableName or columns change locally
+  // Auto-update Canvas (with Validation)
   useEffect(() => {
-    if (selectedNode) {
-      updateNodeData(selectedNode.id, {
-        ...selectedNode.data,
-        name: tableName,
-        columns: columns
+    if (!selectedNode) return;
+
+    const result = tableSchema.safeParse({ name: tableName, columns });
+
+    if (!result.success) {
+      // Perbarui error state tapi tetap update draft (atau block kalau fatal)
+      const formattedErrors: Record<string, string> = {};
+      result.error.errors.forEach(err => {
+         formattedErrors[err.path.join('.')] = err.message;
       });
+      setErrors(formattedErrors);
+      // Kita tetap update canvas buat "visual", tapi SQL Generator nanti yang bakal block PUSH
+    } else {
+      setErrors({});
     }
+
+    updateNodeData(selectedNode.id, {
+      ...selectedNode.data,
+      name: tableName,
+      columns: columns
+    });
   }, [tableName, columns, selectedNode?.id, updateNodeData]);
 
   if (!selectedNode) {
@@ -69,7 +100,7 @@ export default function PropertyPanel() {
   };
 
   return (
-    <aside className="w-[350px] border-l border-slate-200 bg-white flex flex-col h-full animate-in slide-in-from-right duration-300">
+    <aside className="w-[350px] border-l border-slate-200 bg-white flex flex-col h-full shadow-[-10px_0_30px_rgba(0,0,0,0.02)]">
       {/* Header */}
       <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
         <div className="flex items-center gap-2">
@@ -97,9 +128,13 @@ export default function PropertyPanel() {
               type="text"
               value={tableName}
               onChange={(e) => setTableName(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 outline-none transition-all placeholder:font-normal"
+              className={cn(
+                  "w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-4 outline-none transition-all placeholder:font-normal",
+                  errors.name ? "border-red-400 text-red-600 focus:ring-red-500/5 focus:border-red-500" : "border-slate-200 text-slate-800 focus:ring-blue-500/5 focus:border-blue-500"
+              )}
               placeholder="Enter table name..."
             />
+            {errors.name && <p className="text-[10px] font-bold text-red-500 mt-1">{errors.name}</p>}
           </div>
 
           <div className="h-px bg-slate-100" />
@@ -193,6 +228,14 @@ export default function PropertyPanel() {
                 ))}
               </div>
             </div>
+            {errors.columns && (
+              <div className="p-3 bg-red-50 border border-red-100 rounded-xl flex items-start gap-2 animate-in fade-in zoom-in-95">
+                 <div className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5 shrink-0" />
+                 <p className="text-[10px] font-bold text-red-600 leading-tight">
+                    {errors.columns}
+                 </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
