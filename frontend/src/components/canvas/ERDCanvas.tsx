@@ -17,7 +17,7 @@ import '@xyflow/react/dist/style.css';
 import { useSchemaStore } from '@/store/useSchemaStore';
 import { useCanvasStore } from '@/store/useCanvasStore';
 import TableNode from './TableNode';
-import { RefreshCw, Layout, MousePointer2 } from 'lucide-react';
+import { RefreshCw, Layout, MousePointer2, StickyNote, Table as TableIcon, Link2, Plus } from 'lucide-react';
 
 const nodeTypes = {
   table: TableNode,
@@ -35,6 +35,21 @@ export default function ERDCanvas() {
     setEdges,
     setSelectedNode
   } = useCanvasStore();
+
+  const addTable = () => {
+    const id = `table_${Date.now()}`;
+    const newNode: Node = {
+      id,
+      type: 'table',
+      position: { x: 100, y: 100 },
+      data: { 
+        name: 'new_table', 
+        columns: [{ name: 'id', type: 'INT', is_pk: true }] 
+      },
+    };
+    setNodes([...nodes, newNode]);
+    setSelectedNode(newNode);
+  };
 
   // Sync tables to nodes with a Clean Grid Layout
   useEffect(() => {
@@ -120,6 +135,35 @@ export default function ERDCanvas() {
         fitView
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#cbd5e1" />
+        
+        {/* DRAW TOOLS TOOLBAR (LEFT SIDE) */}
+        <Panel position="top-left" className="ml-2 mt-4 flex flex-col gap-2">
+            <div className="bg-white border border-slate-200 p-1.5 rounded-2xl shadow-2xl flex flex-col gap-1.5">
+                <button 
+                    onClick={addTable}
+                    className="p-3 bg-blue-600 text-white rounded-xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all hover:scale-110 active:scale-95 group relative"
+                    title="Add New Table"
+                >
+                    <TableIcon className="w-5 h-5" />
+                    <span className="absolute left-full ml-3 px-2 py-1 bg-slate-800 text-white text-[10px] font-bold rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                        ADD TABLE (T)
+                    </span>
+                </button>
+                
+                <button className="p-3 bg-white text-slate-400 rounded-xl hover:bg-slate-50 hover:text-slate-600 transition-all group relative" title="Add Note">
+                    <StickyNote className="w-5 h-5" />
+                    <span className="absolute left-full ml-3 px-2 py-1 bg-slate-800 text-white text-[10px] font-bold rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                        ADD NOTE (N)
+                    </span>
+                </button>
+
+                <div className="h-px bg-slate-100 mx-2 my-1" />
+
+                <button className="p-3 bg-slate-50 text-blue-600 rounded-xl transition-all group relative" title="Select Mode">
+                    <MousePointer2 className="w-5 h-5 fill-blue-600/10" />
+                </button>
+            </div>
+        </Panel>
         <Controls showInteractive={false} className="!bg-white !border-slate-200 !shadow-xl !rounded-lg overflow-hidden" />
         <MiniMap 
             className="!bg-white !border-slate-200 !shadow-xl !rounded-xl overflow-hidden" 
