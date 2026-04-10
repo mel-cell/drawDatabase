@@ -8,6 +8,7 @@ import {
   Database, 
   ChevronRight, 
   ChevronDown, 
+  ChevronLeft,
   Search, 
   Plus, 
   RefreshCw,
@@ -33,6 +34,7 @@ export default function Sidebar() {
   
   const { activeConnection, applyConnection } = useConnectionStore();
   const [search, setSearch] = useState('');
+  const [isCollapsed, setIsCollapsed] = useState(false);
   
   // Context Menu State
   const [dbMenu, setDbMenu] = useState<{ x: number, y: number, name: string } | null>(null);
@@ -40,21 +42,11 @@ export default function Sidebar() {
   const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    // Jika tidak ada koneksi aktif, jangan lakukan apa-apa
-    if (!activeConnection) {
-      return;
-    }
-
+    if (!activeConnection) return;
     const initSidebar = async () => {
-      // 1. Pastikan backend sinkron dengan koneksi aktif kita (Auto-Apply)
       const ok = await applyConnection(activeConnection);
-      
-      // 2. Jika sukses apply (backend sudah konek), baru tarik database-nya
-      if (ok) {
-        await fetchDatabases();
-      }
+      if (ok) await fetchDatabases();
     };
-    
     initSidebar();
   }, [activeConnection, fetchDatabases, applyConnection]);
 
@@ -99,9 +91,12 @@ export default function Sidebar() {
   );
 
   return (
-    <aside className="w-64 border-r border-gray-200 bg-[#f8f9fa] flex flex-col h-full shrink-0 select-none relative">
+    <aside className={cn(
+        "border-r border-gray-200 bg-[#f8f9fa] flex flex-col h-full shrink-0 select-none relative transition-all duration-300 ease-in-out",
+        isCollapsed ? "w-12" : "w-64"
+    )}>
       {/* Sidebar Header */}
-      <div className="p-4 bg-white border-b border-gray-200">
+      <div className={cn("p-4 bg-white border-b border-gray-200 transition-all duration-300", isCollapsed ? "opacity-0 invisible h-0 p-0 overflow-hidden" : "opacity-100")}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Explorer</h2>
           <div className="flex gap-1">
@@ -130,9 +125,9 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* Database List */}
-      <ScrollArea className="flex-1 px-2 pt-2">
-        <div className="space-y-0.5">
+      {/* Database List - SCROLLABLE AREA */}
+      <div className={cn("flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar px-2 pt-2", isCollapsed && "hidden")}>
+        <div className="space-y-0.5 pb-20">
           {filteredDatabases.length === 0 && !isLoading && (
             <div className="py-12 text-center opacity-40">
                 <Database className="w-10 h-10 mx-auto mb-3 stroke-[1.5px]" />
@@ -188,17 +183,19 @@ export default function Sidebar() {
                           onClick={() => toggleTable(table.name)}
                           onContextMenu={(e) => handleTableContextMenu(e, table.name)}
                           className={cn(
-                            "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-all group/table",
+                            "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-all group/table text-left",
                             expandedTables.has(table.name) ? "text-blue-600 bg-blue-50 font-medium" : "text-gray-500 hover:bg-white hover:text-blue-600"
                           )}
                         >
-                          {expandedTables.has(table.name) ? (
-                            <ChevronDown className="w-3 h-3 text-blue-400" />
-                          ) : (
-                            <ChevronRight className="w-3 h-3 text-gray-300" />
-                          )}
-                          <TableIcon className={cn("w-3.5 h-3.5", expandedTables.has(table.name) ? "text-blue-500" : "text-gray-300")} />
-                          <span className="truncate overflow-hidden">{table.name}</span>
+                          <div className="shrink-0">
+                            {expandedTables.has(table.name) ? (
+                                <ChevronDown className="w-3 h-3 text-blue-400" />
+                            ) : (
+                                <ChevronRight className="w-3 h-3 text-gray-300" />
+                            )}
+                          </div>
+                          <TableIcon className={cn("w-3.5 h-3.5 shrink-0", expandedTables.has(table.name) ? "text-blue-500" : "text-gray-300")} />
+                          <span className="truncate overflow-hidden text-[11px]">{table.name}</span>
                         </button>
 
                         {/* Columns List (Sub-nested) */}
@@ -208,7 +205,7 @@ export default function Sidebar() {
                                     <div key={col.name} className="flex items-center gap-2 text-[10px] text-gray-400 group/col relative">
                                         <div className={cn("w-1 h-1 rounded-full", col.is_pk ? "bg-amber-400" : "bg-gray-200")}></div>
                                         <span className={cn(col.is_pk && "text-gray-600 font-bold")}>{col.name}</span>
-                                        <span className="text-[8px] opacity-40 font-mono">{col.type}</span>
+                                        <span className="text-[8px] opacity-40 font-mono shrink-0 uppercase">{col.type.split('(')[0]}</span>
                                     </div>
                                 ))}
                             </div>
@@ -221,7 +218,35 @@ export default function Sidebar() {
             </div>
           ))}
         </div>
-      </ScrollArea>
+      </div>
+
+      {/* Collapse Toggle Button (Hover on border) */}
+      <button 
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-12 bg-white border border-gray-200 rounded-full flex items-center justify-center shadow-lg hover:bg-blue-600 hover:text-white transition-all z-50 group"
+      >
+        {isCollapsed ? (
+          <ChevronRight className="w-4 h-4" />
+        ) : (
+          <ChevronLeft className="w-4 h-4" />
+        )}
+      </button>
+
+      {/* Connection Info Footer */}
+      <div className={cn("p-4 bg-white border-t border-gray-200 flex items-center gap-3 transition-all duration-300", isCollapsed ? "opacity-0 invisible h-0 p-0" : "opacity-100")}>
+        <div className="relative">
+          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+          <div className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping opacity-30"></div>
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-bold text-gray-300 uppercase tracking-tight truncate leading-none mb-1">MySQL Connected</p>
+          <p className="text-xs font-bold text-gray-700 truncate tracking-tight">{activeConnection?.name || 'Local MySQL'}</p>
+        </div>
+        <SettingsBtn />
+      </div>
+    </aside>
+  );
+}
 
       {/* DB CONTEXT MENU */}
       {dbMenu && (
