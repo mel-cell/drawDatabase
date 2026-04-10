@@ -8,6 +8,8 @@ import { useConnectionStore } from '@/store/useConnectionStore';
 import { useSchemaStore } from '@/store/useSchemaStore';
 import { Database, Plus } from 'lucide-react';
 
+import ERDCanvas from '@/components/canvas/ERDCanvas';
+
 export default function Home() {
   const [activePage, setActivePage] = useState<'diagram' | 'data' | 'sql'>('diagram');
   const [isConnModalOpen, setIsConnModalOpen] = useState(false);
@@ -33,7 +35,7 @@ export default function Home() {
 
         {/* Center Canvas / Content Area */}
         <div className="flex-1 relative bg-slate-50 flex flex-col overflow-hidden">
-          {/* Active Database Content Placeholder */}
+          {/* Active Database Content Area */}
           {!currentDatabase ? (
             <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
               <div className="w-20 h-20 bg-blue-100 rounded-3xl flex items-center justify-center mb-6">
@@ -56,12 +58,18 @@ export default function Home() {
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex items-center justify-center p-12">
-               <div className="text-center">
-                 <p className="text-slate-400 font-mono text-sm">Workspace for:</p>
-                 <h2 className="text-4xl font-black text-slate-900 mt-2 uppercase tracking-tighter">{currentDatabase}</h2>
-                 <p className="mt-4 text-slate-500">Wait for Tahap Utama: ERD Canvas Integration...</p>
-               </div>
+            <div className="flex-1 flex flex-col overflow-hidden">
+                {activePage === 'diagram' && <ERDCanvas />}
+                {activePage === 'data' && (
+                    <div className="flex-1 flex items-center justify-center p-12 text-slate-400">
+                        Data Browser Coming Soon...
+                    </div>
+                )}
+                {activePage === 'sql' && (
+                    <div className="flex-1 flex items-center justify-center p-12 text-slate-400">
+                        SQL Console Coming Soon...
+                    </div>
+                )}
             </div>
           )}
 

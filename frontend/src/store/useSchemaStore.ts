@@ -9,6 +9,7 @@ interface SchemaState {
   databases: string[];
   currentDatabase: string | null;
   tables: Table[];
+  relations: any[]; // Tambahkan ini
   isLoading: boolean;
   isTablesLoading: boolean;
   fetchDatabases: () => Promise<void>;
@@ -23,6 +24,7 @@ export const useSchemaStore = create<SchemaState>((set) => ({
   databases: [],
   currentDatabase: null,
   tables: [],
+  relations: [],
   isLoading: false,
   isTablesLoading: false,
 
@@ -40,7 +42,7 @@ export const useSchemaStore = create<SchemaState>((set) => ({
   },
 
   setCurrentDatabase: (db) => {
-    set({ currentDatabase: db, tables: [] });
+    set({ currentDatabase: db, tables: [], relations: [] });
     if (db) {
       // Trigger fetch tables automatically
       useSchemaStore.getState().fetchTables(db);
@@ -54,11 +56,15 @@ export const useSchemaStore = create<SchemaState>((set) => ({
       const res = await fetch(`${API_URL}/schema?db=${encodeURIComponent(db)}`);
       if (!res.ok) throw new Error('Failed to fetch schema');
       const data = await res.json();
-      // Backend returns a schema object, usually containing tables
-      set({ tables: data.tables || [], isTablesLoading: false });
+      // Backend returns a schema object, usually containing tables ddan relations
+      set({ 
+        tables: data.tables || [], 
+        relations: data.relations || [],
+        isTablesLoading: false 
+      });
     } catch (error) {
       console.error('Error fetching tables:', error);
-      set({ tables: [], isTablesLoading: false });
+      set({ tables: [], relations: [], isTablesLoading: false });
     }
   },
 
