@@ -37,11 +37,11 @@ interface CanvasState {
 export const useCanvasStore = create<CanvasState>()(
   persist(
     immer(
-      (set, get) => ({
-        nodes: [],
-        edges: [],
-        selectedNode: null,
-        dbContext: null,
+      (set) => ({
+        nodes: [] as Node[],
+        edges: [] as Edge[],
+        selectedNode: null as Node | null,
+        dbContext: null as string | null,
 
         onNodesChange: (changes: NodeChange[]) => {
           set((state) => {

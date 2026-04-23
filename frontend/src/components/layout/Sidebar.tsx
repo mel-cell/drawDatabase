@@ -15,7 +15,6 @@ import {
   RefreshCw,
   Table as TableIcon,
   Trash2,
-  Terminal,
   MoreVertical
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -37,11 +36,9 @@ export default function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isCreateDbModalOpen, setIsCreateDbModalOpen] = useState(false);
   
-  // Context Menu State
   const [dbMenu, setDbMenu] = useState<{ x: number, y: number, name: string } | null>(null);
-  const [tableMenu, setTableMenu] = useState<{ x: number, y: number, name: string } | null>(null);
   const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set());
-
+  
   useEffect(() => {
     if (!activeConnection) return;
     const initSidebar = async () => {
@@ -54,19 +51,9 @@ export default function Sidebar() {
   const handleDbContextMenu = (e: React.MouseEvent, db: string) => {
     e.preventDefault();
     setDbMenu({ x: e.clientX, y: e.clientY, name: db });
-    setTableMenu(null);
   };
 
-  const handleTableContextMenu = (e: React.MouseEvent, table: string) => {
-    e.preventDefault();
-    setTableMenu({ x: e.clientX, y: e.clientY, name: table });
-    setDbMenu(null);
-  };
-
-  const closeMenus = () => {
-    setDbMenu(null);
-    setTableMenu(null);
-  };
+  const closeMenus = () => setDbMenu(null);
 
   useEffect(() => {
     window.addEventListener('click', closeMenus);
@@ -80,244 +67,120 @@ export default function Sidebar() {
     setExpandedTables(next);
   };
 
-  const handleDropDb = async (db: string) => {
-    if (confirm(`Are you sure you want to drop database "${db}"?`)) {
-      const ok = await dropDatabase(db);
-      if (ok) toast.success(`Database "${db}" dropped`);
-    }
-  };
-
   const filteredDatabases = databases.filter(db => 
     db.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
     <aside className={cn(
-        "border-r border-gray-200 bg-[#f8f9fa] flex flex-col h-full shrink-0 select-none relative transition-all duration-300 ease-in-out",
+        "border-r border-slate-100 bg-[#F8FAFC] flex flex-col h-full shrink-0 select-none relative transition-all duration-300",
         isCollapsed ? "w-12" : "w-64"
     )}>
-      {/* Sidebar Header */}
-      <div className={cn("p-4 bg-white border-b border-gray-200 transition-all duration-300", isCollapsed ? "opacity-0 invisible h-0 p-0 overflow-hidden" : "opacity-100")}>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Explorer</h2>
-          <div className="flex gap-1">
-            <button 
-                onClick={() => fetchDatabases()}
-                className="p-1.5 hover:bg-gray-100 rounded-md text-gray-400 hover:text-blue-600 transition-all"
-                title="Refresh All"
-            >
-              <RefreshCw className={cn("w-3.5 h-3.5", isLoading && "animate-spin")} />
-            </button>
-            <button 
-              onClick={() => setIsCreateDbModalOpen(true)}
-              className="p-1.5 hover:bg-gray-100 rounded-md text-gray-400 hover:text-blue-600 transition-all" 
-              title="Create New Database"
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </button>
-          </div>
+      {/* Search & Header Section */}
+      <div className={cn("p-6 transition-all", isCollapsed ? "opacity-0 invisible h-0" : "opacity-100")}>
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Data Explorer</h2>
+          <button 
+              onClick={() => fetchDatabases()}
+              className={cn("p-1.5 hover:bg-white hover:shadow-sm text-slate-400 rounded-lg transition-all", isLoading && "animate-spin")}
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+          </button>
         </div>
 
         <div className="relative group">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 group-focus-within:text-[#1A73E8] transition-colors" />
           <input
             type="text"
             placeholder="Search databases..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-8 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:ring-4 focus:ring-blue-500/5 focus:border-blue-400 outline-none transition-all placeholder:text-gray-400"
+            className="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-200/60 rounded-xl text-[11px] font-bold text-slate-700 shadow-sm focus:ring-4 focus:ring-blue-500/5 focus:border-[#1A73E8] outline-none transition-all placeholder:text-slate-300"
           />
         </div>
       </div>
 
-      {/* Database List - SCROLLABLE AREA */}
-      <div className={cn("flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar px-2 pt-2", isCollapsed && "hidden")}>
-        <div className="space-y-0.5 pb-20">
-          {filteredDatabases.length === 0 && !isLoading && (
-            <div className="py-12 text-center opacity-40">
-                <Database className="w-10 h-10 mx-auto mb-3 stroke-[1.5px]" />
-                <p className="text-[10px] font-bold uppercase tracking-widest">No Results</p>
-            </div>
-          )}
-
+      {/* List Area */}
+      <div className={cn("flex-1 overflow-y-auto px-3 space-y-1", isCollapsed && "hidden")}>
           {filteredDatabases.map((db) => (
-            <div key={db} className="group relative">
+            <div key={db} className="space-y-1">
               <button
                 onClick={() => setCurrentDatabase(currentDatabase === db ? null : db)}
                 onContextMenu={(e) => handleDbContextMenu(e, db)}
                 className={cn(
-                  "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all",
+                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group",
                   currentDatabase === db 
-                    ? "bg-blue-600 text-white shadow-md shadow-blue-100 font-medium" 
-                    : "text-gray-600 hover:bg-white hover:shadow-sm"
+                    ? "bg-white text-[#1A73E8] shadow-sm shadow-blue-900/5 font-black border border-blue-50" 
+                    : "text-slate-500 hover:bg-white hover:text-slate-900"
                 )}
               >
-                <div className="shrink-0">
-                  {currentDatabase === db ? (
-                    <ChevronDown className="w-3.5 h-3.5 text-blue-100" />
-                  ) : (
-                    <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
-                  )}
-                </div>
-                <Database className={cn("w-4 h-4 shrink-0", currentDatabase === db ? "text-blue-100" : "text-gray-400")} />
-                <span className="truncate flex-1 text-left">{db}</span>
-                
-                <MoreVertical 
-                  className={cn(
-                    "w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity",
-                    currentDatabase === db ? "text-blue-200" : "text-gray-300"
-                  )} 
-                  onClick={(e) => { e.stopPropagation(); handleDbContextMenu(e as any, db); }}
-                />
+                <Database className={cn("w-4 h-4 shrink-0", currentDatabase === db ? "text-[#1A73E8]" : "text-slate-300")} />
+                <span className="truncate flex-1 text-left text-xs tracking-tight">{db}</span>
+                {currentDatabase === db ? <ChevronDown className="w-3.5 h-3.5 opacity-40" /> : <ChevronRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-40" />}
               </button>
 
-              {/* Nested Table List */}
               {currentDatabase === db && (
-                <div className="ml-6 mt-1 mb-2 space-y-0.5 border-l-2 border-blue-500/10 pl-3 py-1 animate-in slide-in-from-left-2 duration-200">
-                   <div className="flex items-center justify-between pr-2 mb-1">
-                      <span className="text-[9px] font-black text-blue-300 uppercase tracking-widest">Tables</span>
-                      {isTablesLoading && <RefreshCw className="w-2.5 h-2.5 animate-spin text-blue-300" />}
+                <div className="ml-5 mt-1 mb-3 pl-4 border-l-2 border-slate-100 space-y-1 animate-in slide-in-from-left-2 duration-300">
+                   <div className="flex items-center justify-between mb-2 pl-1">
+                      <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Schemas</span>
+                      <button onClick={() => setIsCreateDbModalOpen(true)} className="p-1 hover:bg-white rounded"><Plus className="w-2.5 h-2.5 text-slate-300" /></button>
                    </div>
 
                    {tables.length === 0 && !isTablesLoading ? (
-                     <p className="text-[10px] text-gray-400 italic py-2 pl-2">No tables found</p>
+                     <p className="text-[10px] text-slate-300 italic pl-1">No tables found</p>
                    ) : (
                      tables.map((table: any) => (
-                       <div key={table.name} className="space-y-0.5">
-                        <button 
+                       <button 
+                          key={table.name}
                           onClick={() => toggleTable(table.name)}
-                          onContextMenu={(e) => handleTableContextMenu(e, table.name)}
                           className={cn(
-                            "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-all group/table text-left",
-                            expandedTables.has(table.name) ? "text-blue-600 bg-blue-50 font-medium" : "text-gray-500 hover:bg-white hover:text-blue-600"
+                            "w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-left transition-all group",
+                            expandedTables.has(table.name) ? "text-[#1A73E8] bg-blue-50/50 font-bold" : "text-slate-400 hover:text-slate-600 hover:bg-white"
                           )}
                         >
-                          <div className="shrink-0">
-                            {expandedTables.has(table.name) ? (
-                                <ChevronDown className="w-3 h-3 text-blue-400" />
-                            ) : (
-                                <ChevronRight className="w-3 h-3 text-gray-300" />
-                            )}
-                          </div>
-                          <TableIcon className={cn("w-3.5 h-3.5 shrink-0", expandedTables.has(table.name) ? "text-blue-500" : "text-gray-300")} />
-                          <span className="truncate overflow-hidden text-[11px]">{table.name}</span>
+                          <TableIcon className="w-3.5 h-3.5 shrink-0 opacity-40 group-hover:opacity-100" />
+                          <span className="truncate text-[11px]">{table.name}</span>
                         </button>
-
-                        {/* Columns List (Sub-nested) */}
-                        {expandedTables.has(table.name) && table.columns && (
-                            <div className="ml-4 pl-3 border-l border-blue-100 py-1 space-y-1 animate-in slide-in-from-top-1 duration-150">
-                                {table.columns.map((col: any) => (
-                                    <div key={col.name} className="flex items-center gap-2 text-[10px] text-gray-400 group/col relative">
-                                        <div className={cn("w-1 h-1 rounded-full", col.is_pk ? "bg-amber-400" : "bg-gray-200")}></div>
-                                        <span className={cn(col.is_pk && "text-gray-600 font-bold")}>{col.name}</span>
-                                        <span className="text-[8px] opacity-40 font-mono shrink-0 uppercase">{col.type.split('(')[0]}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                       </div>
                      ))
                    )}
                 </div>
               )}
             </div>
           ))}
-        </div>
       </div>
 
-      {/* Collapse Toggle Button (Hover on border) */}
-      <button 
-        onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-12 bg-white border border-gray-200 rounded-full flex items-center justify-center shadow-lg hover:bg-blue-600 hover:text-white transition-all z-50 group"
-      >
-        {isCollapsed ? (
-          <ChevronRight className="w-4 h-4" />
-        ) : (
-          <ChevronLeft className="w-4 h-4" />
-        )}
-      </button>
-
-      {/* Connection Info Footer */}
-      <div className={cn("p-4 bg-white border-t border-gray-200 flex items-center gap-3 transition-all duration-300", isCollapsed ? "opacity-0 invisible h-0 p-0" : "opacity-100")}>
+      {/* Footer Status Section (Color Indication) */}
+      <div className={cn("p-6 border-t border-slate-100 bg-white flex items-center gap-3", isCollapsed && "hidden")}>
         <div className="relative">
-          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
-          <div className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping opacity-30"></div>
+          <div className="w-2.5 h-2.5 rounded-full bg-[#10B981]"></div>
+          <div className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-[#10B981] animate-ping opacity-30"></div>
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-bold text-gray-300 uppercase tracking-tight truncate leading-none mb-1">MySQL Connected</p>
-          <p className="text-xs font-bold text-gray-700 truncate tracking-tight">{activeConnection?.name || 'Local MySQL'}</p>
+          <p className="text-[10px] font-black text-slate-200 uppercase tracking-widest leading-none mb-1">Status Connected</p>
+          <p className="text-[11px] font-black text-slate-700 truncate tracking-tight">{activeConnection?.name || 'Local MySQL'}</p>
         </div>
-        <SettingsBtn />
+        <MoreVertical className="w-4 h-4 text-slate-200" />
       </div>
 
-      {/* DB CONTEXT MENU */}
+      <button 
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-12 bg-white border border-slate-100 rounded-full flex items-center justify-center shadow-lg text-slate-300 hover:text-[#1A73E8] transition-all z-50 group"
+      >
+        {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+      </button>
+
       {dbMenu && (
         <div 
-          className="fixed z-[1000] w-48 bg-white border border-gray-200 shadow-xl rounded-xl py-1 animate-in zoom-in-95 duration-100"
+          className="fixed z-[3000] w-48 bg-white border border-slate-100 shadow-2xl rounded-xl py-1.5 text-[11px] font-bold text-slate-600"
           style={{ top: dbMenu.y, left: dbMenu.x }}
-          onClick={(e) => e.stopPropagation()}
         >
-          <div className="px-3 py-2 border-b border-gray-50 bg-gray-50/50 rounded-t-xl">
-            <p className="text-[10px] uppercase font-bold text-gray-400 tracking-tighter truncate">{dbMenu.name}</p>
-          </div>
-          <button className="w-full text-left px-3 py-2 text-xs text-gray-600 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2 transition-colors">
-            <RefreshCw className="w-3 h-3" /> Refresh Schema
-          </button>
-          <button className="w-full text-left px-3 py-2 text-xs text-gray-600 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2 transition-colors">
-            <Plus className="w-3 h-3" /> New Table
-          </button>
-          <button className="w-full text-left px-3 py-2 text-xs text-gray-600 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2 transition-colors">
-            <Terminal className="w-3 h-3" /> SQL Console
-          </button>
-          <div className="h-px bg-gray-100 my-1"></div>
-          <button 
-            onClick={() => handleDropDb(dbMenu.name)}
-            className="w-full text-left px-3 py-2 text-xs text-red-610 hover:bg-red-50 flex items-center gap-2 transition-colors"
-          >
-            <Trash2 className="w-3 h-3" /> Drop Database
-          </button>
+          <button className="w-full text-left px-4 py-2 hover:bg-blue-50 hover:text-[#1A73E8] transition-colors">Refresh Tables</button>
+          <button className="w-full text-left px-4 py-2 hover:bg-blue-50 hover:text-[#1A73E8] transition-colors">SQL Interface</button>
+          <div className="h-px bg-slate-50 my-1"></div>
+          <button className="w-full text-left px-4 py-2 text-red-400 hover:bg-red-50 transition-colors">Drop Database</button>
         </div>
       )}
-
-      {/* TABLE CONTEXT MENU */}
-      {tableMenu && (
-        <div 
-          className="fixed z-[1000] w-48 bg-white border border-gray-200 shadow-xl rounded-xl py-1 animate-in zoom-in-95 duration-100"
-          style={{ top: tableMenu.y, left: tableMenu.x }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="px-3 py-2 border-b border-gray-50 bg-gray-50/50 rounded-t-xl">
-            <p className="text-[10px] uppercase font-bold text-gray-400 tracking-tighter truncate">{tableMenu.name}</p>
-          </div>
-          <button className="w-full text-left px-3 py-2 text-xs text-gray-600 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2 transition-colors">
-            <Search className="w-3 h-3" /> View Data
-          </button>
-          <button className="w-full text-left px-3 py-2 text-xs text-gray-600 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2 transition-colors">
-            <RefreshCw className="w-3 h-3" /> Sync to Canvas
-          </button>
-          <button className="w-full text-left px-3 py-2 text-xs text-gray-600 hover:bg-blue-50 hover:text-blue-600 flex items-center gap-2 transition-colors">
-            <Plus className="w-3 h-3" /> Add Column
-          </button>
-          <div className="h-px bg-gray-100 my-1"></div>
-          <button 
-            className="w-full text-left px-3 py-2 text-xs text-red-610 hover:bg-red-50 flex items-center gap-2 transition-colors"
-          >
-            <Trash2 className="w-3 h-3" /> Drop Table
-          </button>
-        </div>
-      )}
-      <CreateDatabaseModal 
-        isOpen={isCreateDbModalOpen} 
-        onClose={() => setIsCreateDbModalOpen(false)} 
-      />
+      <CreateDatabaseModal isOpen={isCreateDbModalOpen} onClose={() => setIsCreateDbModalOpen(false)} />
     </aside>
   );
-}
-
-function SettingsBtn() {
-    return (
-        <button className="p-1.5 text-gray-300 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-all">
-            <MoreVertical className="w-4 h-4" />
-        </button>
-    )
 }
