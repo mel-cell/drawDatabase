@@ -5,7 +5,6 @@ import { useToast } from "../../composables/useToast";
 import {
   X,
   Database,
-  Table as TableIcon,
   ChevronRight,
   Info,
   Layers,
